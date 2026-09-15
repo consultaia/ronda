@@ -933,6 +933,53 @@ const SOAP = [
    {id:'slivre', tipo:'area', lab:'Complemento'},
  ]},
 
+ {id:'dia', tit:'Evolução do dia', campos:[
+   {id:'consc2', tipo:'radio', lab:'Consciência', opts:[
+     {v:'a', l:'Vigil, lúcido e orientado', t:'vigil, lúcido(a) e orientado(a), verbalizando sem dificuldades'},
+     {v:'b', l:'Sonolento, despertável', t:'sonolento(a), despertável ao chamado'},
+     {v:'c', l:'Desorientado', t:'vigil, porém desorientado(a)'},
+     {v:'d', l:'Sedado', t:'sob sedação'},
+     {v:'e', l:'Rebaixado', t:'com rebaixamento do nível de consciência'},
+   ]},
+   {id:'hemo', tipo:'radio', lab:'Hemodinâmica', opts:[
+     {v:'a', l:'Estável', t:'normotenso(a) e normocárdico(a), estável clínica e hemodinamicamente'},
+     {v:'b', l:'Hipertenso', t:'hipertenso(a), sem outros sinais de instabilidade'},
+     {v:'c', l:'Hipotenso / DVA', t:'hipotenso(a), em uso de droga vasoativa'},
+     {v:'d', l:'Taquicárdico', t:'taquicárdico(a)'},
+   ]},
+   {id:'resp2', tipo:'radio', lab:'Respiratório', opts:[
+     {v:'a', l:'Eupneico em AA', t:'eupneico(a) em ar ambiente, sem desconforto respiratório'},
+     {v:'b', l:'Eupneico com O2', t:'eupneico(a) em uso de O2 suplementar'},
+     {v:'c', l:'Dispneico', t:'dispneico(a), com esforço respiratório'},
+     {v:'d', l:'Em VM', t:'em ventilação mecânica'},
+   ]},
+   {id:'febre', tipo:'radio', lab:'Temperatura', opts:[
+     {v:'a', l:'Afebril', t:'afebril, sem relato de febre'},
+     {v:'b', l:'Febre nas 24h', t:'com pico febril nas últimas 24 horas'},
+   ]},
+   {id:'diu2', tipo:'radio', lab:'Diurese', opts:[
+     {v:'a', l:'Presente, espontânea', t:'diurese presente e espontânea'},
+     {v:'b', l:'Por SVD', t:'diurese por sonda vesical de demora'},
+     {v:'c', l:'Oligúria', t:'em oligúria'},
+   ]},
+   {id:'evac2', tipo:'radio', lab:'Evacuações', opts:[
+     {v:'a', l:'Presentes', t:'dejeções presentes e sem alterações'},
+     {v:'b', l:'Ausentes', t:'sem evacuação há {evacd} dia(s)'},
+     {v:'c', l:'Diarreia', t:'com evacuações diarreicas'},
+   ]},
+   {id:'evacd', tipo:'num', lab:'Dias sem evacuar', dep:{campo:'evac2',valor:'b'}},
+   {id:'interc', tipo:'check', lab:'Intercorrências nas 24h', opts:[
+     {v:'nenhuma', l:'Sem intercorrências', t:'sem intercorrências'},
+     {v:'dor', l:'Dor', t:'episódio de dor, manejado com analgesia'},
+     {v:'febre', l:'Febre', t:'pico febril'},
+     {v:'hipot', l:'Hipotensão', t:'episódio de hipotensão'},
+     {v:'dessat', l:'Dessaturação', t:'episódio de dessaturação'},
+     {v:'sangr', l:'Sangramento', t:'sangramento'},
+     {v:'queda', l:'Queda', t:'queda do leito'},
+     {v:'agit', l:'Agitação', t:'agitação psicomotora'},
+   ]},
+   {id:'dialivre', tipo:'area', lab:'Complemento da evolução (ex.: refere melhora da parestesia em MSE)'},
+ ]},
  {id:'vit', tit:'Sinais vitais e balanço', campos:[
    {id:'pa', tipo:'pa', lab:'PA (mmHg)', pas:'pas', pad:'pad', t:'PA {pas}x{pad} mmHg (PAM {pam})'},
    {id:'fc', tipo:'num', lab:'FC', t:'FC {fc} bpm'},
@@ -1051,9 +1098,31 @@ const SOAP = [
    ]},
  ]},
 
- {id:'ex', tit:'Exames complementares', campos:[
-   {id:'lab', tipo:'area', lab:'Laboratório'},
+ {id:'lab', tit:'Laboratório de hoje', campos:[
+   {id:'labData', tipo:'texto', lab:'Data (dd/mm)'},
+   {id:'hb', tipo:'texto', lab:'Hb'},
+   {id:'ht', tipo:'texto', lab:'Ht'},
+   {id:'leuco', tipo:'texto', lab:'Leuco'},
+   {id:'plaq', tipo:'texto', lab:'Plaq'},
+   {id:'na', tipo:'texto', lab:'Na'},
+   {id:'k', tipo:'texto', lab:'K'},
+   {id:'pi', tipo:'texto', lab:'P'},
+   {id:'mg', tipo:'texto', lab:'Mg'},
+   {id:'ur', tipo:'texto', lab:'Ur'},
+   {id:'cr', tipo:'texto', lab:'Cr'},
+   {id:'tfg', tipo:'texto', lab:'TFG'},
+   {id:'pcr', tipo:'texto', lab:'PCR'},
+   {id:'tp', tipo:'texto', lab:'TP (%)'},
+   {id:'ttpa', tipo:'texto', lab:'TTPa'},
+   {id:'rni', tipo:'texto', lab:'RNI'},
+   {id:'gaso', tipo:'texto', lab:'Gasometria (pH/pCO2/HCO3/lact)'},
+   {id:'labExtra', tipo:'texto', lab:'Outros (ex.: Ca 8,5; Bt 0,8; TGO 30)'},
+ ]},
+
+ {id:'ex', tit:'Outros exames e pareceres', campos:[
+   {id:'lab', tipo:'area', lab:'Laboratório anterior (colado)'},
    {id:'img', tipo:'area', lab:'Imagem'},
+   {id:'ic', tipo:'area', lab:'Interconsultas / pareceres de hoje'},
  ]},
 
  {id:'a', tit:'Avaliação', campos:[
@@ -1069,21 +1138,26 @@ const SOAP = [
 
  {id:'p', tit:'Plano', campos:[
    {id:'plano', tipo:'check', lab:'Condutas', opts:[
-     {v:'atb', l:'Mantém antibioticoterapia', t:'Mantida antibioticoterapia (D{atbdia})'},
-     {v:'sint', l:'Mantém sintomáticos', t:'Mantidos sintomáticos e medidas de suporte'},
-     {v:'analg', l:'Ajusta analgesia', t:'Ajustado esquema de analgesia'},
-     {v:'hv', l:'Hidratação venosa', t:'Mantida hidratação venosa'},
-     {v:'lab', l:'Solicita exames', t:'Solicitado controle laboratorial'},
-     {v:'parecer', l:'Aguarda parecer', t:'Aguardando parecer de especialidade'},
-     {v:'fisio', l:'Fisioterapia', t:'Mantida fisioterapia motora e respiratória'},
-     {v:'fono', l:'Fonoaudiologia', t:'Mantida avaliação fonoaudiológica da deglutição'},
-     {v:'lpp', l:'Prevenção de LPP', t:'Mantidas medidas de prevenção de lesão por pressão'},
-     {v:'tvp', l:'Profilaxia de TVP', t:'Mantida profilaxia de TVP'},
-     {v:'equipe', l:'Discute com equipe', t:'Caso discutido com a equipe assistente'},
-     {v:'familia', l:'Conversa com família', t:'Conversado com familiares sobre quadro e prognóstico'},
-     {v:'alta', l:'Programa alta', t:'Programada alta hospitalar com receita e orientações'},
+     {v:'atb', l:'Mantém antibioticoterapia', t:'Mantida antibioticoterapia (D{atbdia})', h:'Mantenho antibioticoterapia'},
+     {v:'sint', l:'Mantém sintomáticos', t:'Mantidos sintomáticos e medidas de suporte', h:'Mantenho sintomáticos e medidas de suporte'},
+     {v:'analg', l:'Ajusta analgesia', t:'Ajustado esquema de analgesia', h:'Ajusto esquema de analgesia'},
+     {v:'hv', l:'Hidratação venosa', t:'Mantida hidratação venosa', h:'Mantenho hidratação venosa'},
+     {v:'lab', l:'Solicita exames', t:'Solicitado controle laboratorial', h:'Solicito controle laboratorial'},
+     {v:'parecer', l:'Aguarda parecer', t:'Aguardando parecer de especialidade', h:'Aguardo parecer de especialidade'},
+     {v:'fisio', l:'Fisioterapia', t:'Mantida fisioterapia motora e respiratória', h:'Mantenho fisioterapia motora e respiratória'},
+     {v:'fono', l:'Fonoaudiologia', t:'Mantida avaliação fonoaudiológica da deglutição', h:'Mantenho avaliação fonoaudiológica'},
+     {v:'lpp', l:'Prevenção de LPP', t:'Mantidas medidas de prevenção de lesão por pressão', h:'Mantenho medidas de prevenção de LPP'},
+     {v:'tvp', l:'Profilaxia de TVP', t:'Mantida profilaxia de TVP', h:'Mantenho profilaxia de TVP'},
+     {v:'vig', l:'Vigilância pressórica e glicêmica', t:'Mantida vigilância pressórica e glicêmica', h:'Vigilância pressórica e glicêmica'},
+     {v:'equipe', l:'Discute com equipe', t:'Caso discutido com a equipe assistente', h:'Discuto caso com a equipe assistente'},
+     {v:'familia', l:'Ciente do quadro', t:'Paciente e familiares cientes do quadro clínico e condutas', h:'Mantenho paciente e familiar cientes do quadro clínico e condutas'},
+     {v:'alta', l:'Programa alta', t:'Programada alta hospitalar com receita e orientações', h:'Programo alta hospitalar com receita e orientações'},
    ]},
-   {id:'plivre', tipo:'area', lab:'Complemento'},
+   {id:'plivre', tipo:'area', lab:'Condutas específicas (uma por linha)'},
+   {id:'pendAlta', tipo:'radio', lab:'Pendência para alta?', opts:[
+     {v:'sim', l:'Sim', t:''},{v:'nao', l:'Não', t:''},
+   ]},
+   {id:'pendQual', tipo:'texto', lab:'Qual?', dep:{campo:'pendAlta',valor:'sim'}},
  ]},
 ];
 
@@ -1253,6 +1327,96 @@ function gerarSAE(p,vBruto,comSAE){
   return L.join('\n');
 }
 
+/* ============================================================
+   LEITOR DE PRONTUARIO — deterministico, sem IA.
+   Reconhece o formato de evolucao de MV/Tasy/Soul e similares
+   (titulos de secao, P1./P2., LAB (dd/mm), PAM :, etc.).
+   O que nao reconhece, fica como texto. Nada e inventado.
+   ============================================================ */
+const TITULOS=/^[ \t]*(Admiss[aã]o[^:\n]{0,30}|HMA|HPP|Hist[oó]ria[^:\n]{0,30}|Lista de problemas|Evolu[cç][aã]o[^:\n]{0,30}|Sinais Vitais|Exame f[ií]sico[^:\n]{0,30}|Exames complementares|Exames[^:\n]{0,30}|Interconsultas?|Pareceres?|Plano[^:\n]{0,40}|Condutas?|Pend[eê]ncia[^:\n]{0,40}|Diagn[oó]sticos?[^:\n]{0,30}|MUC|Medica[cç][oõ]es em uso[^:\n]{0,20})[ \t]*:/gim;
+
+function iniciaisDe(nome){
+  return nome.trim().split(/\s+/).filter(x=>!/^(de|da|do|dos|das|e)$/i.test(x)).map(x=>x[0].toUpperCase()+'.').join('');
+}
+function secoes(T){
+  const idx=[]; let m; TITULOS.lastIndex=0;
+  while((m=TITULOS.exec(T))) idx.push({tit:m[1].trim().toLowerCase(),ini:m.index,fim:m.index+m[0].length});
+  const out={};
+  idx.forEach((s,i)=>{ let corpo=T.slice(s.fim, i+1<idx.length?idx[i+1].ini:T.length)
+      .replace(/^[ \t]*pend[eê]ncia para desospitaliza[cç][aã]o[ \t]*$/gim,'').replace(/\n{2,}/g,'\n').trim();
+    if(corpo) out[s.tit]=(out[s.tit]?out[s.tit]+'\n':'')+corpo; });
+  return out;
+}
+const pega=(obj,re)=>{ const k=Object.keys(obj).find(k=>re.test(k)); return k?obj[k]:''; };
+const num=(T,re)=>{ const m=T.match(re); return m?m[1].replace(',','.'):''; };
+
+function lerProntuario(texto){
+  const T=(texto||'').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n');
+  const r={dispositivos:[],antibioticos:[]};
+
+  // 1a linha "417.3 NYCOLE" ou "Leito 12A - Maria Silva"
+  const cab=T.split('\n').map(x=>x.trim()).find(x=>x);
+  let m=cab&&cab.match(/^(?:leito\s*)?([0-9]{1,3}[.\-\/]?[0-9A-Za-z]{0,3})\s*[-–:]?\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{2,60})$/i);
+  if(m){ r.leito=m[1]; r.nome=m[2].trim(); r.iniciais=iniciaisDe(r.nome); }
+
+  const S=secoes(T);
+  const lp=pega(S,/lista de problemas|diagn/);
+  if(lp){
+    const linhas=lp.split('\n').map(x=>x.trim()).filter(Boolean);
+    r.problemas=linhas.map(x=>x.replace(/^P\d+\.\s*/i,'').replace(/^>\s*/,'  > ')).join('\n');
+    const p1=linhas.find(x=>/^P?1\./i.test(x)||!/^>/.test(x));
+    if(p1) r.dx=p1.replace(/^P\d+\.\s*/i,'').trim();
+  }
+  const muc=T.match(/\bMUC\s*:\s*([^\n]+)/i)||T.match(/medica[cç][oõ]es? em uso[^:\n]*:\s*([^\n]+)/i);
+  if(muc) r.muc=muc[1].trim().replace(/\.$/,'');
+  if(/nega\s+alergias?/i.test(T)) r.alergia='';
+  else { const al=T.match(/alergi[ao]s?\s*(?:a|:)\s*([^\n.;]+)/i); if(al&&!/nega/i.test(al[0])) r.alergia=al[1].trim(); }
+
+  r.vitais={
+    pas:num(T,/\bPA\b[^0-9\n]{0,15}(\d{2,3})\s*[x\/×]\s*\d{2,3}/i),
+    pad:num(T,/\bPA\b[^0-9\n]{0,15}\d{2,3}\s*[x\/×]\s*(\d{2,3})/i),
+    pam:num(T,/\bPAM\b[^0-9\n]{0,15}(\d{2,3})/i),
+    fc:num(T,/\bFC\b[^0-9\n]{0,15}(\d{2,3})/i),
+    fr:num(T,/\bFR\b[^0-9\n]{0,15}(\d{1,2})/i),
+    tax:num(T,/(?:Temperatura|Tax|T\s*ax)[^0-9\n]{0,15}(\d{2}[.,]\d)/i),
+    sat:num(T,/(?:SpO|Sat)[^0-9\n]{0,25}(\d{2,3})\b/i),
+    glasgow:num(T,/Glasgow[^0-9\n]{0,10}(\d{1,2})/i),
+    hgt:num(T,/\b(?:HGT|glicemia)[^0-9\n]{0,15}(\d{2,3})/i),
+  };
+  Object.keys(r.vitais).forEach(k=>{ if(!r.vitais[k]) delete r.vitais[k]; });
+
+  const labs=T.split('\n').filter(l=>/\bLAB\b\s*\(|hemograma|EAS\s*\(|sorolog/i.test(l)).map(l=>l.replace(/^[^:]{0,40}laboratoriais\s*:\s*/i,'').trim());
+  r.lab=labs.join('\n');
+  r.exames=pega(S,/exames complementares|^exames/);
+  r.interconsultas=pega(S,/interconsulta|parecer/);
+  r.plano=pega(S,/^plano|^conduta/);
+  r.evolucao=pega(S,/^evolu/);
+  r.admissao=pega(S,/^admiss|^hma|^hist/);
+  const pa=T.match(/pend[eê]ncia para alta\??\s*:\s*(sim|n[aã]o)/i);
+  if(pa&&/sim/i.test(pa[1])){ const q=T.match(/qual\??\s*:\s*([^\n]+)/i); r.pendenciaAlta=q?q[1].trim():'pendência para alta'; }
+
+  const disp=[[/\bSVD\b|sonda vesical/i,'svd'],[/\bCVC\b|cateter venoso central/i,'cvc'],[/\bPICC\b/i,'picc'],
+    [/\bTOT\b|intubad|tubo orotraqueal/i,'tot'],[/\bTQT\b|traqueost/i,'tqt'],[/\bAVP\b|acesso venoso perif/i,'avp'],
+    [/\bSNE\b|sonda (?:naso)?enteral|\bSNG\b/i,'sne'],[/\bdreno\b/i,'dreno'],[/\bPAI\b|PAM invasiva|linha arterial/i,'pam'],
+    [/cateter de (?:hemo)?di[aá]lise|\bshilley\b|\bCDL\b/i,'hd']];
+  disp.forEach(([re,v])=>{ if(re.test(T)) r.dispositivos.push({tipo:v,local:'',desde:''}); });
+  const atbRe=/\b(ceftriaxona|cefepime|cefazolina|cefalexina|cefuroxima|ceftazidima|piperacilina[- ]tazobactam|pipe[- ]?tazo|meropenem|imipenem|ertapenem|vancomicina|teicoplanina|linezolida|oxacilina|ampicilina(?:[- ]sulbactam)?|amoxicilina(?:[- ]clavulanato)?|azitromicina|claritromicina|ciprofloxacino|levofloxacino|moxifloxacino|metronidazol|clindamicina|sulfametoxazol[- ]trimetoprim|polimixina|amicacina|gentamicina|daptomicina|tigeciclina|fluconazol|anfotericina|aciclovir|oseltamivir)\b[^\n;,]{0,25}/gi;
+  const vistos=new Set();
+  (T.match(atbRe)||[]).forEach(x=>{ const n=x.trim().replace(/\s+/g,' '); const k=n.toLowerCase().split(' ')[0]; if(!vistos.has(k)){ vistos.add(k); r.antibioticos.push({nome:n,desde:''}); } });
+
+  r.reconhecido=[r.leito&&'leito',r.iniciais&&'iniciais',r.problemas&&'problemas',r.muc&&'MUC',
+    Object.keys(r.vitais).length&&'sinais vitais',r.lab&&'laboratório',r.interconsultas&&'interconsultas',
+    r.plano&&'plano',r.pendenciaAlta&&'pendência de alta',r.dispositivos.length&&'dispositivos',r.antibioticos.length&&'antibióticos'].filter(Boolean);
+  return r;
+}
+// Troca o nome completo pelas iniciais em todo o texto antes de salvar.
+function anonimizar(texto,nome,iniciais){
+  if(!nome) return texto;
+  let t=texto.replace(new RegExp(nome.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),iniciais);
+  nome.split(/\s+/).filter(x=>x.length>=4).forEach(p=>{ t=t.replace(new RegExp('\\b'+p+'\\b','gi'),iniciais); });
+  return t;
+}
+
 /* --- dispositivos e antibioticos do cadastro, com contagem de dias --- */
 function diasDesde(iso){
   if(!iso) return null;
@@ -1289,6 +1453,10 @@ function prefill(p,tipo){
   } else {
     if(p.status==='uti'){ if(tem('tot')||tem('tqt')) v.o2s='vm'; }
     if(p.antibioticos&&p.antibioticos.length) v.plano=['atb'];
+    if(p.problemas) v.problemas=p.problemas.split('\n').map(x=>x.trim()).filter(Boolean).join('; ');
+    const imp=p.importado||{};
+    v.labData=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+    if(imp.plano) v.plivre=imp.plano.split('\n').map(x=>x.replace(/^[-–>]\s*/,'').trim()).filter(Boolean).join('\n');
   }
   return v;
 }
@@ -1307,6 +1475,154 @@ function campoSOAP(secId,campoId,v){
     }).filter(Boolean);
   }
   return (c.t && v[c.id]!==undefined && v[c.id]!=='')?[preencher(c.t,v)]:[];
+}
+
+/* --- laboratorio: linha no padrao do prontuario e historico --- */
+const ANALITOS=[['hb','HB'],['ht','HT'],['leuco','LEUCO'],['plaq','PLAQ'],['na','NA'],['k','K'],['pi','P'],['mg','MG'],
+  ['ur','UR'],['cr','CR'],['tfg','TFG'],['pcr','PCR'],['tp','TP','%'],['ttpa','TTPA'],['rni','RNI'],['gaso','GASO']];
+function labLinha(v){
+  const partes=ANALITOS.filter(([k])=>v[k]!==undefined&&String(v[k]).trim()!=='').map(([k,r,suf])=>r+' '+String(v[k]).trim()+(suf||''));
+  if(v.labExtra&&v.labExtra.trim()) partes.push(v.labExtra.trim());
+  if(!partes.length) return '';
+  const d=(v.labData&&v.labData.trim())||new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  return '- LAB ('+d+'): '+partes.join(' | ');
+}
+function historicoLabs(p,v){
+  const L=[];
+  const hoje=labLinha(v||{}); if(hoje) L.push(hoje);
+  (p.labs||[]).forEach(x=>L.push(x.linha));
+  const imp=(p.importado&&p.importado.lab)||'';
+  imp.split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>{ const y=x.startsWith('-')?x:'- '+x; if(!L.includes(y)) L.push(y); });
+  return L;
+}
+const NORMAL={
+  cab:'Sem alterações, ausência de linfadenomegalias ou edemas, mucosas normocoradas e hidratadas',
+  acv:'Bulhas cardíacas normofonéticas, ritmo regular em 2 tempos, sem sopros',
+  ap:'Murmúrio vesicular presente e simétrico, sem ruídos adventícios',
+  abd:'Abdome plano, flácido, indolor à palpação, sem massas ou visceromegalias',
+  mmii:'Sem edemas, perfusão periférica preservada, sem deformidades, ausência de cianose ou lesões cutâneas',
+  neuro:'LOTE, força muscular preservada, sensibilidade e reflexos osteotendíneos normais',
+  pele:'Integridade preservada, ausência de lesões, sem sinais de desidratação ou palidez',
+};
+function genero(t,p){
+  if(p.sexo==='F') return t.replace(/o\(a\)/g,'a').replace(/\(a\)/g,'a');
+  if(p.sexo==='M') return t.replace(/\(a\)/g,'');
+  return t;
+}
+function primeiraFrases(t,n){ return (t||'').replace(/\s+/g,' ').split(/(?<=\.)\s+/).slice(0,n).join(' '); }
+
+function gerarHospitalar(p,vBruto){
+  const v=normalizar(vBruto);
+  const {dih}=cabecalho(p);
+  const um=(s,c)=>campoSOAP(s,c,v)[0]||'';
+  const L=[];
+  L.push('Evolução clínica médica');
+  L.push('');
+  // Lista de problemas
+  const prob=(p.problemas||v.problemas||'').split(/\n|;/).map(x=>x.trim()).filter(Boolean);
+  if(prob.length){
+    L.push('Lista de problemas:');
+    let n=0;
+    prob.forEach(x=>{ if(/^>/.test(x)) L.push('     '+x); else { n++; L.push('P'+n+'. '+x.replace(/^P\d+\.\s*/i,'')); } });
+    L.push('');
+  }
+  // Evolucao clinica (narrativa + panorama)
+  const f=[];
+  f.push('Encontro paciente em leito de '+(p.status==='uti'?'terapia intensiva':'enfermaria')+
+    (dih?', no '+dih+'º dia de internação':'')+(p.dx?' por '+p.dx:'')+
+    (um('dia','consc2')?', '+um('dia','consc2'):'')+'.');
+  const hemo=um('dia','hemo'), resp=um('dia','resp2'), feb=um('dia','febre');
+  const ln=[hemo,resp,feb].filter(Boolean); if(ln.length) f.push(ln.map(x=>maiuscula(x)+'.').join(' '));
+  const aval=um('a','aval'); if(aval){ const a=aval.replace(/^Paciente /,''); f.push(maiuscula(a)+(/dia anterior/.test(a)?'.':' em relação ao dia anterior.')); }
+  const q=campoSOAP('s','sub',v).filter(x=>!/sem queixas/.test(x)); if(q.length) f.push(maiuscula(listaE(q))+'.');
+  if(v.dialivre) f.push(v.dialivre.trim().replace(/\.?$/,'.'));
+  const diet=um('s','aceit'); if(diet) f.push('Refere '+diet+' por via oral.'.replace('da dieta por via oral','da dieta por via oral'));
+  const el=[um('dia','diu2'),um('dia','evac2')].filter(Boolean); if(el.length) f.push(maiuscula(el.join(' e '))+'.');
+  const ic=campoSOAP('dia','interc',v);
+  if(ic.length) f.push(ic.includes('sem intercorrências')?'Sem outras queixas e intercorrências.':'Intercorrências nas últimas 24h: '+ic.join(', ')+'.');
+  L.push('Evolução Clínica:');
+  L.push(genero(f.join(' '),p));
+  // Panorama: admissao resumida (se importada) + avaliacoes anteriores
+  const pan=[];
+  const adm=p.importado&&p.importado.admissao; if(adm) pan.push(primeiraFrases(adm,2));
+  const ants=(p.evolucoes||[]).filter(e=>e.tipo==='médica'&&e.respostas&&e.respostas.aval).slice(0,5).reverse()
+    .map(e=>new Date(e.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+': '+
+      ((SOAP.find(s=>s.id==='a').campos[0].opts.find(o=>o.v===e.respostas.aval)||{}).l||'').toLowerCase());
+  if(ants.length) pan.push('Evolução prévia — '+ants.join('; ')+'.');
+  if(pan.length){ L.push(''); L.push('Panorama: '+pan.join(' ')); }
+  L.push('');
+  // Sinais vitais
+  L.push('Sinais Vitais');
+  L.push('PAM (mmHg): '+(v.pam||''));
+  if(v.pas&&v.pad) L.push('PA (mmHg): '+v.pas+'x'+v.pad);
+  L.push('FC (bpm): '+(v.fc||''));
+  L.push('FR (irpm): '+(v.fr||''));
+  L.push('Temperatura (°C): '+(v.tax||''));
+  L.push('SpO2 (%): '+(v.sat||''));
+  L.push('Glasgow: '+(v.glasgow||''));
+  if(v.hgt) L.push('HGT (mg/dL): '+v.hgt);
+  if(v.diu) L.push('Diurese 24h (mL): '+v.diu);
+  if(v.bh) L.push('BH 24h (mL): '+v.bh);
+  L.push('');
+  // Exame fisico por segmento
+  const seg=(id,titulo,chave,normalVals)=>{
+    const val=v[id]; const txt=um('ef',id);
+    const normal = !val || normalVals.includes(val);
+    return {titulo, linha:titulo+': '+(normal?'Normal: '+NORMAL[chave]:'Alterado: '+txt), alterado:normal?null:txt};
+  };
+  const segs=[
+    {titulo:'1. Cabeça e pescoço', linha:'1. Cabeça e pescoço: '+((!v.geral||v.geral==='a')?'Normal: '+NORMAL.cab:'Alterado: '+um('ef','geral')), alterado:(!v.geral||v.geral==='a')?null:um('ef','geral')},
+    seg('acv','2. Cardiovascular','acv',['a']),
+    seg('ap','3. Pulmonar','ap',['a']),
+    seg('abd','4. Abdome','abd',['a']),
+    seg('mmii','5. Extremidades','mmii',['a']),
+    {titulo:'6. Neurológico', linha:'6. Neurológico: '+((!v.neuro||v.neuro==='a')?'Normal: '+NORMAL.neuro:'Alterado: '+[um('ef','neuro'),um('ef','forca')].filter(Boolean).join(', ')), alterado:(!v.neuro||v.neuro==='a')?null:[um('ef','neuro'),um('ef','forca')].filter(Boolean).join(', ')},
+    seg('pele','7. Pele','pele',['a']),
+  ];
+  L.push('Exame físico por segmento:');
+  segs.forEach(s=>L.push(s.linha));
+  const alt=segs.filter(s=>s.alterado).map(s=>s.titulo.replace(/^\d\.\s*/,'')+': '+s.alterado);
+  if(v.efalt) alt.push(v.efalt.trim());
+  L.push('Descrição de achados específicos: '+(alt.length?alt.join('; '):'sem achados específicos'));
+  L.push('');
+  // Exames
+  const labs=historicoLabs(p,v);
+  L.push('Exames complementares:');
+  L.push('Exames internos laboratoriais:');
+  if(labs.length) labs.forEach(x=>L.push(x)); else L.push('- ');
+  if(v.img||(p.importado&&p.importado.exames&&/imagem/i.test(p.importado.exames))){
+    L.push('Exames de imagem:');
+    if(v.img) L.push('- '+v.img.trim());
+  }
+  if(v.cult){ L.push('Culturas:'); L.push('- '+v.cult.trim()); }
+  L.push('');
+  // Interconsultas
+  const icAnt=(p.importado&&p.importado.interconsultas)||'';
+  if(v.ic||icAnt){
+    L.push('Interconsultas:');
+    if(v.ic) L.push(v.ic.trim());
+    if(icAnt) L.push(icAnt.trim());
+    L.push('');
+  }
+  // Plano
+  L.push('Plano diagnóstico/Terapêutico:');
+  const dsp=dispositivosTexto(p), atbs=antibioticosTexto(p);
+  const plano=(v.plano||[]).map(k=>{ const o=SOAP.find(s=>s.id==='p').campos[0].opts.find(o=>o.v===k); if(!o) return '';
+    let t=o.h||o.t; if(k==='atb'&&atbs) t+=': '+atbs; return t; }).filter(Boolean);
+  plano.forEach(x=>L.push('- '+x));
+  if(v.plivre) v.plivre.split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>L.push('- '+x.replace(/^[-–>]\s*/,'')));
+  if(dsp) L.push('- Dispositivos: '+dsp);
+  L.push('');
+  // Pendencia para alta
+  const pend=v.pendAlta || ((p.pendencias||[]).some(x=>!x.feito)?'sim':'');
+  if(pend){
+    L.push('Pendência para alta?: '+(pend==='sim'?'Sim':'Não'));
+    if(pend==='sim'){
+      const qual=v.pendQual||(p.pendencias||[]).filter(x=>!x.feito).map(x=>x.texto).join('; ');
+      if(qual) L.push('Qual?: '+qual);
+    }
+  }
+  return L.join('\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 function gerarSOAP(p,vBruto,comAssinatura){
@@ -1360,9 +1676,10 @@ function gerarSOAP(p,vBruto,comAssinatura){
   if(atbs)            linhas.push('ATB: '+atbs+'.');
   if(terap.length)    linhas.push('Profilaxias: '+terap.join('; ')+'.');
   if(usaUTI&&bundle.length) linhas.push('Bundle: '+bundle.join('; ')+'.');
-  if(v.lab)           linhas.push('Laboratório: '+v.lab);
+  const labsH=historicoLabs(p,v); if(labsH.length) linhas.push('Laboratório: '+labsH.join(' / '));
   if(v.img)           linhas.push('Imagem: '+v.img);
   if(v.cult)          linhas.push('Culturas: '+v.cult);
+  if(v.ic)            linhas.push('Pareceres: '+v.ic);
 
   if(linhas.length){ L.push('O: '+linhas[0]); linhas.slice(1).forEach(x=>L.push('   '+x)); }
   else L.push('O: ____');
@@ -1381,7 +1698,7 @@ function gerarSOAP(p,vBruto,comAssinatura){
   if(plano.length||v.plivre){
     L.push('P:');
     plano.forEach(x=>L.push('   - '+x+'.'));
-    if(v.plivre) L.push('   - '+v.plivre);
+    if(v.plivre) v.plivre.split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>L.push('   - '+x));
   } else L.push('P: ____');
 
   if(comAssinatura){
@@ -1391,31 +1708,95 @@ function gerarSOAP(p,vBruto,comAssinatura){
   return L.join('\n');
 }
 
-function gerarPassagem(pacientes,perfil){
+/* ---------- Passagem de plantão (SBAR) ---------- */
+const PRIO={uti:0,parecer:1,exame:2,ativo:3,alta:4};
+function ultimaDe(p,tipoAlvo){
+  return (p.evolucoes||[]).find(e=>e.tipo===tipoAlvo||e.tipo==='prontuário');
+}
+function gerarPassagem(pacientes,perfil,unidade){
   const tipoAlvo = perfil==='medica' ? 'médica' : 'enfermagem';
-  const titulo = perfil==='medica' ? 'PASSAGEM DE PLANTÃO MÉDICO' : 'PASSAGEM DE PLANTÃO DE ENFERMAGEM';
-  const L=[titulo+' — '+new Date().toLocaleDateString('pt-BR')+' às '+
-           new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),''];
-  const ordem=[...pacientes].sort((a,b)=>String(a.leito).localeCompare(String(b.leito),'pt',{numeric:true}));
+  const agora=new Date();
+  const L=['PASSAGEM DE PLANTÃO '+(perfil==='medica'?'MÉDICO':'DE ENFERMAGEM')+(unidade?' — '+unidade:'')+' — '+
+           agora.toLocaleDateString('pt-BR')+' '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),''];
+  const ordem=[...pacientes].sort((a,b)=>(PRIO[a.status]??3)-(PRIO[b.status]??3)
+    || String(a.leito).localeCompare(String(b.leito),'pt',{numeric:true}));
+
+  // Bloco de atencao
+  const al=[];
+  ordem.filter(p=>p.status==='uti').forEach(p=>al.push('UTI: leito '+p.leito+' ('+p.iniciais+')'));
+  ordem.forEach(p=>(p.dispositivos||[]).forEach(d=>{ const n=diasDesde(d.desde);
+    if(n>=7){ const def=DISPOSITIVOS.find(x=>x.v===d.tipo)||{sigla:d.tipo}; al.push('Dispositivo ≥7 dias: leito '+p.leito+' — '+def.sigla+' D'+n); } }));
+  ordem.forEach(p=>(p.antibioticos||[]).forEach(a=>{ const n=diasDesde(a.desde); if(n>=10) al.push('ATB ≥10 dias: leito '+p.leito+' — '+a.nome+' D'+n); }));
+  ordem.forEach(p=>(p.pendencias||[]).filter(x=>!x.feito&&x.criadoEm&&Date.now()-x.criadoEm>DIA).forEach(x=>al.push('Pendência >24h: leito '+p.leito+' — '+x.texto)));
+  ordem.filter(p=>p.alergia).forEach(p=>al.push('Alergia: leito '+p.leito+' — '+p.alergia));
+  L.push('ATENÇÃO'); if(al.length) al.forEach(x=>L.push('- '+x)); else L.push('- Sem alertas.'); L.push('');
+
   ordem.forEach(p=>{
     const dih=diasDe(p.admissao);
     const st=(STATUS.find(x=>x.v===p.status)||{}).l;
     L.push('LEITO '+p.leito+' — '+p.iniciais+(p.idade?', '+p.idade+'a':'')+(dih?', '+dih+'º DIH':'')+(st&&p.status!=='ativo'?' — '+st.toUpperCase():''));
-    if(p.dx) L.push('  Dx: '+p.dx);
-    if(p.problemas) L.push('  Problemas: '+p.problemas.split('\n').filter(Boolean).join('; '));
-    if(p.alergia) L.push('  ALERGIA: '+p.alergia);
-    const dsp=dispositivosTexto(p), atb=antibioticosTexto(p);
-    if(dsp) L.push('  Dispositivos: '+dsp);
-    if(atb) L.push('  ATB: '+atb);
-    const ult=(p.evolucoes||[]).find(e=>e.tipo===tipoAlvo);
-    if(ult) L.push('  Última evolução ('+new Date(ult.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'): '+ult.resumo);
+    // S
+    const s=[p.dx].filter(Boolean);
     const nota=(p.evolucoes||[]).find(e=>e.tipo==='nota');
-    if(nota) L.push('  Nota: '+nota.texto);
-    const abertas=(p.pendencias||[]).filter(x=>!x.feito);
-    if(abertas.length) L.push('  Pendências: '+abertas.map(x=>x.texto).join('; '));
+    if(nota) s.push('Nota: '+nota.texto);
+    L.push('  S: '+(s.join('. ')||'—'));
+    // B
+    const b=[];
+    if(p.problemas) b.push('Problemas: '+p.problemas.split('\n').map(x=>x.trim()).filter(Boolean).join('; '));
+    const dsp=dispositivosTexto(p), atb=antibioticosTexto(p);
+    if(dsp) b.push('Dispositivos: '+dsp);
+    if(atb) b.push('ATB: '+atb);
+    if(p.muc) b.push('MUC: '+p.muc);
+    if(p.alergia) b.push('ALERGIA: '+p.alergia);
+    L.push('  B: '+(b.join('. ')||'—'));
+    // A
+    const ult=ultimaDe(p,tipoAlvo);
+    L.push('  A: '+(ult
+      ? (ult.tipo==='prontuário'?'Prontuário':'Evolução')+' '+new Date(ult.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+
+        (ult.autor?' ('+ult.autor.split('@')[0]+')':'')+': '+(ult.resumo||'')
+      : '—'));
+    // R
+    const r=[];
+    if(p.proximoPlantao) r.push(p.proximoPlantao.replace(/[.;\s]+$/,''));
+    const abertas=(p.pendencias||[]).filter(x=>!x.feito).map(x=>x.texto);
+    if(abertas.length) r.push('Pendências: '+abertas.join('; '));
+    L.push('  R: '+(r.join('. ')||'—'));
     L.push('');
   });
   return L.join('\n');
+}
+
+function Plantao({pacientes,perfil,unidade,salvar,aviso,voltar}){
+  const [soPend,setSoPend]=useState(false);
+  const lista=soPend?pacientes.filter(p=>(p.pendencias||[]).some(x=>!x.feito)||p.proximoPlantao):pacientes;
+  const texto=useMemo(()=>gerarPassagem(lista,perfil,unidade),[lista,perfil,unidade]);
+  const wa='https://wa.me/?text='+encodeURIComponent(texto);
+  const ordem=[...pacientes].sort((a,b)=>(PRIO[a.status]??3)-(PRIO[b.status]??3)||String(a.leito).localeCompare(String(b.leito),'pt',{numeric:true}));
+  return (
+    <>
+      <div className="form">
+        <div className="secao-tit" style={{marginTop:0}}>
+          <span>Para o próximo plantão (R)</span>
+          <button onClick={()=>setSoPend(!soPend)}>{soPend?'mostrar todos':'só com pendência'}</button>
+        </div>
+        {ordem.map(p=>(
+          <div className="item disp-item" key={p.id} style={{alignItems:'center'}}>
+            <div className="leito" style={{fontSize:13,minWidth:46}}><small>LEITO</small>{p.leito}</div>
+            <input style={{flex:1}} placeholder={'o que '+p.iniciais+' precisa no próximo plantão'} defaultValue={p.proximoPlantao||''}
+              onBlur={e=>{ const v=e.target.value.trim(); if(v!==(p.proximoPlantao||'')) salvar({...p,proximoPlantao:v}); }}/>
+          </div>
+        ))}
+        <div style={{height:14}}/>
+        <Folha texto={texto}/>
+      </div>
+      <div className="barra">
+        <button className="btn sec mono" style={{flex:'0 0 auto',padding:'12px 14px'}} onClick={voltar}>✕</button>
+        <button className="btn sec" onClick={async()=>aviso(await copiar(texto)?'copiado':'falhou')}>Copiar</button>
+        <a className="btn" style={{textDecoration:'none'}} href={wa} target="_blank" rel="noopener">WhatsApp</a>
+        {navigator.share && <button className="btn" onClick={()=>navigator.share({title:'Passagem de plantão',text:texto}).catch(()=>{})}>Enviar…</button>}
+      </div>
+    </>
+  );
 }
 
 /* ============================================================
@@ -1707,7 +2088,7 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
   }
   function novaPendencia(){
     const t=prompt('Nova pendência:');
-    if(t) atualizar({...p, pendencias:[...(p.pendencias||[]),{id:uid_(),texto:t,feito:false}]});
+    if(t) atualizar({...p, pendencias:[...(p.pendencias||[]),{id:uid_(),texto:t,feito:false,criadoEm:Date.now()}]});
   }
   function alternar(id){
     atualizar({...p, pendencias:(p.pendencias||[]).map(x=>x.id===id?{...x,feito:!x.feito}:x)});
@@ -1728,7 +2109,25 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
     setAddAtb(null);
   }
   const tipoEvo = ehEnf?'enfermagem':'médica';
-  const minhas=(p.evolucoes||[]).filter(e=>e.tipo===tipoEvo||e.tipo==='nota');
+  const minhas=(p.evolucoes||[]).filter(e=>e.tipo===tipoEvo||e.tipo==='nota'||e.tipo==='prontuário');
+  const [colar,setColar]=useState(false); const [txtPront,setTxtPront]=useState('');
+  function importar(){
+    const r=lerProntuario(txtPront); if(!r.reconhecido.length){ aviso('não reconheci a estrutura — salvo como texto'); }
+    const texto=anonimizar(txtPront.trim(),r.nome,r.iniciais);
+    const jaTem=t=>(p.dispositivos||[]).some(d=>d.tipo===t);
+    const jaAtb=n=>(p.antibioticos||[]).some(a=>a.nome.toLowerCase().split(' ')[0]===n.toLowerCase().split(' ')[0]);
+    const novo={...p,
+      problemas:r.problemas||p.problemas||'', dx:p.dx||r.dx||'', muc:r.muc||p.muc||'',
+      alergia:p.alergia||r.alergia||'',
+      importado:{lab:r.lab||'',exames:r.exames||'',interconsultas:r.interconsultas||'',plano:r.plano||'',vitais:r.vitais||{},quando:new Date().toISOString()},
+      dispositivos:[...(p.dispositivos||[]),...r.dispositivos.filter(d=>!jaTem(d.tipo)).map(d=>({id:uid_(),...d}))],
+      antibioticos:[...(p.antibioticos||[]),...r.antibioticos.filter(a=>!jaAtb(a.nome)).map(a=>({id:uid_(),...a}))],
+      pendencias:[...(p.pendencias||[]),...(r.pendenciaAlta&&!(p.pendencias||[]).some(x=>x.texto===r.pendenciaAlta)?[{id:uid_(),texto:r.pendenciaAlta,feito:false,criadoEm:Date.now()}]:[])],
+      evolucoes:[{id:uid_(),tipo:'prontuário',texto,resumo:(r.evolucao||texto).replace(/\s+/g,' ').slice(0,160),autor,quando:new Date().toISOString()},...(p.evolucoes||[])],
+    };
+    atualizar(novo); setTxtPront(''); setColar(false);
+    aviso(r.reconhecido.length?'importado: '+r.reconhecido.join(', '):'texto salvo na linha do tempo');
+  }
 
   return (
     <>
@@ -1752,6 +2151,24 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
         </div>
         {p.dx && <div className="item"><div className="item-cab"><span>DIAGNÓSTICO</span></div><p>{p.dx}</p></div>}
         {p.problemas && <div className="item"><div className="item-cab"><span>LISTA DE PROBLEMAS</span></div><p>{p.problemas}</p></div>}
+        {p.muc && <div className="item"><div className="item-cab"><span>MEDICAÇÕES EM USO</span></div><p>{p.muc}</p></div>}
+        {p.importado&&p.importado.interconsultas && <div className="item"><div className="item-cab"><span>INTERCONSULTAS (PRONTUÁRIO)</span></div><p>{p.importado.interconsultas}</p></div>}
+
+        <div className="secao-tit">
+          <span>Colar evolução do prontuário</span>
+          <button onClick={()=>setColar(!colar)}>{colar?'fechar':'+ colar'}</button>
+        </div>
+        {colar ? (
+          <div className="item">
+            <textarea value={txtPront} onChange={e=>setTxtPront(e.target.value)} style={{minHeight:140}}
+              placeholder="Cole aqui a evolução copiada do MV/Tasy/Soul. O app lê leito, problemas, MUC, alergia, sinais vitais, laboratório, interconsultas, plano e pendência de alta. O nome completo é trocado pelas iniciais antes de salvar."/>
+            <button className="btn" style={{width:'100%',marginTop:8}} disabled={!txtPront.trim()} onClick={importar}>Ler e importar</button>
+          </div>
+        ) : <div className="vazio">Copie do prontuário e cole aqui — problemas, MUC, exames e plano entram sozinhos.</div>}
+
+        <div className="secao-tit"><span>Para o próximo plantão</span></div>
+        <input defaultValue={p.proximoPlantao||''} placeholder="ex.: reavaliar diurese às 18h; se < 0,5 mL/kg/h, chamar nefro"
+          onBlur={e=>{ const v=e.target.value.trim(); if(v!==(p.proximoPlantao||'')) atualizar({...p,proximoPlantao:v}); }}/>
 
         {equipes.length>0 && <>
           <div className="secao-tit"><span>Ambiente</span></div>
@@ -1888,11 +2305,11 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
         {minhas.map(e=>(
           <div className="item" key={e.id}>
             <div className="item-cab">
-              <span>{e.tipo==='nota'?'NOTA':'EVOLUÇÃO '+e.tipo.toUpperCase()}{e.autor&&e.autor!==autor?' · '+e.autor.split('@')[0]:''}</span>
+              <span>{e.tipo==='nota'?'NOTA':e.tipo==='prontuário'?'PRONTUÁRIO (IMPORTADO)':'EVOLUÇÃO '+e.tipo.toUpperCase()}{e.autor&&e.autor!==autor?' · '+e.autor.split('@')[0]:''}</span>
               <span>{new Date(e.quando).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
             </div>
             <p>{e.texto}</p>
-            {e.tipo!=='nota' &&
+            {e.tipo!=='nota' && e.tipo!=='prontuário' &&
               <button className="btn sec mono" style={{marginTop:10,width:'100%'}}
                 onClick={async()=>aviso(await copiar(e.texto)?'copiado':'falhou — selecione o texto')}>
                 Copiar para o prontuário
@@ -1921,7 +2338,8 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
 }
 
 /* ---------- Construtor de evolução (passo a passo no celular) ---------- */
-const VITAIS=['pas','pad','fc','fr','tax','sat','hgt','diu','bh','spo2','o2','glasgow','eva','tec','debito','peso'];
+const VITAIS=['pas','pad','fc','fr','tax','sat','hgt','diu','bh','spo2','o2','glasgow','eva','tec','debito','peso',
+  'labData','hb','ht','leuco','plaq','na','k','pi','mg','ur','cr','tfg','pcr','tp','ttpa','rni','gaso','labExtra','ic','img','dialivre','interc'];
 function secaoPreenchida(sec,v){
   return sec.campos.some(c=>{ const x=v[c.id]; return Array.isArray(x)?x.length>0:(x!==undefined&&x!==''&&x!==null); });
 }
@@ -1932,14 +2350,16 @@ function Evolucao({p,tipo,autor,ir,atualizar,aviso,largo,proximo}){
   const [recuperado,setRecuperado]=useState(!!rasc);
   const [pronto,setPronto]=useState(false);
   const [extra,setExtra]=useState(false);
+  const [formato,setFormato]=useState(()=>localStorage.getItem('ronda.formato')||'hosp'); // hosp | soap
+  useEffect(()=>{ localStorage.setItem('ronda.formato',formato); },[formato]);
   const [uti,setUti]=useState(p.status==='uti');
   const [passo,setPasso]=useState(0);
   const [verTudo,setVerTudo]=useState(false);
   const set=(k,val)=>setV(o=>({...o,[k]:val}));
   const esquema = tipo==='enfermagem' ? SAE : SOAP.filter(s=>s.id!=='uti'||uti);
   const texto = useMemo(
-    ()=> tipo==='enfermagem'?gerarSAE(p,v,extra):gerarSOAP(p,v,extra),
-    [p,v,tipo,extra]);
+    ()=> tipo==='enfermagem'?gerarSAE(p,v,extra):(formato==='hosp'?gerarHospitalar(p,v):gerarSOAP(p,v,extra)),
+    [p,v,tipo,extra,formato]);
   const ultima = (p.evolucoes||[]).find(e=>e.tipo===tipo && e.respostas);
 
   // Rascunho automatico: 1,5 s depois do ultimo toque, grava no paciente.
@@ -1981,7 +2401,9 @@ function Evolucao({p,tipo,autor,ir,atualizar,aviso,largo,proximo}){
     const resumo=(tipo==='enfermagem'
       ? (v.consc?acha(SAE,'consc',v.consc):'avaliado')
       : (v.aval?acha(SOAP,'aval',v.aval):'avaliado'));
-    atualizar({...p, rascunho:null,
+    const linha=tipo!=='enfermagem'?labLinha(v):'';
+    const labs=linha&&!(p.labs||[]).some(x=>x.linha===linha)?[{linha,quando:new Date().toISOString()},...(p.labs||[])]:(p.labs||[]);
+    atualizar({...p, rascunho:null, labs,
       evolucoes:[{id:uid_(),tipo,texto,resumo,respostas:v,autor,quando:new Date().toISOString()},...(p.evolucoes||[])]});
     ir({tela:'ficha',id:p.id});
   }
@@ -1992,10 +2414,14 @@ function Evolucao({p,tipo,autor,ir,atualizar,aviso,largo,proximo}){
         <div className="campo">
           <span className="campo-lab">Formato</span>
           <div className="opcoes">
-            <button className="op" data-on={!extra?'1':'0'} onClick={()=>setExtra(false)}>
-              {tipo==='enfermagem'?'Evolução corrida':'Evolução'}</button>
-            <button className="op" data-on={extra?'1':'0'} onClick={()=>setExtra(true)}>
-              {tipo==='enfermagem'?'Corrida + diagnósticos NANDA':'Com linha de assinatura'}</button>
+            {tipo==='enfermagem' ? <>
+              <button className="op" data-on={!extra?'1':'0'} onClick={()=>setExtra(false)}>Evolução corrida</button>
+              <button className="op" data-on={extra?'1':'0'} onClick={()=>setExtra(true)}>Corrida + diagnósticos NANDA</button>
+            </> : <>
+              <button className="op" data-on={formato==='hosp'?'1':'0'} onClick={()=>setFormato('hosp')}>Hospitalar (prontuário)</button>
+              <button className="op" data-on={formato==='soap'?'1':'0'} onClick={()=>setFormato('soap')}>SOAP compacto</button>
+              {formato==='soap' && <button className="op" data-on={extra?'1':'0'} onClick={()=>setExtra(!extra)}>Linha de assinatura</button>}
+            </>}
           </div>
         </div>
         <Folha texto={texto}/>
@@ -2073,10 +2499,38 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
     alergia:'',admissao:new Date().toISOString().slice(0,10),riscoQueda:false,lpp:false,equipeId:equipeId||null,...(inicial||{})}));
   const s=(k,val)=>setF(o=>({...o,[k]:val}));
   const editando=!!(inicial&&inicial.id);
+  const [colar,setColar]=useState(false); const [txt,setTxt]=useState(''); const [lido,setLido]=useState(null);
+  function ler(){
+    const r=lerProntuario(txt); setLido(r);
+    setF(o=>({...o, leito:r.leito||o.leito, iniciais:r.iniciais||o.iniciais, dx:r.dx||o.dx, problemas:r.problemas||o.problemas,
+      muc:r.muc||o.muc||'', alergia:(r.alergia!==undefined?r.alergia:o.alergia)}));
+  }
+  function extras(){
+    if(!lido) return {};
+    const texto=anonimizar(txt.trim(),lido.nome,lido.iniciais);
+    return {
+      importado:{lab:lido.lab||'',exames:lido.exames||'',interconsultas:lido.interconsultas||'',plano:lido.plano||'',vitais:lido.vitais||{},quando:new Date().toISOString()},
+      dispositivos:lido.dispositivos.map(d=>({id:uid_(),...d})),
+      antibioticos:lido.antibioticos.map(a=>({id:uid_(),...a})),
+      pendencias:lido.pendenciaAlta?[{id:uid_(),texto:lido.pendenciaAlta,feito:false,criadoEm:Date.now()}]:[],
+      evolucoes:[{id:uid_(),tipo:'prontuário',texto,resumo:(lido.evolucao||texto).replace(/\s+/g,' ').slice(0,160),quando:new Date().toISOString()}],
+    };
+  }
   return (
     <div className="fundo" onClick={fechar}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h2>{editando?'Editar paciente':'Novo paciente'}</h2>
+        {!editando && (colar
+          ? <div className="item" style={{marginBottom:12}}>
+              <textarea value={txt} onChange={e=>setTxt(e.target.value)} style={{minHeight:120}}
+                placeholder="Cole a evolução do prontuário. Leito, iniciais, problemas, MUC, alergia, exames, interconsultas e plano entram sozinhos."/>
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                <button className="btn sec" style={{flex:1}} onClick={()=>{setColar(false);}}>Fechar</button>
+                <button className="btn" style={{flex:1}} disabled={!txt.trim()} onClick={ler}>Ler</button>
+              </div>
+              {lido && <div className="aviso" style={{marginTop:8}}>Reconhecido: {lido.reconhecido.join(', ')||'nada — o texto vai como registro'}. Confira os campos abaixo.</div>}
+            </div>
+          : <button className="btn sec" style={{width:'100%',marginBottom:12}} onClick={()=>setColar(true)}>📋 Colar do prontuário</button>)}
         <div className="linha-num">
           <div className="num"><label>Leito</label>
             <input value={f.leito} onChange={e=>s('leito',e.target.value)} autoFocus={!editando}/></div>
@@ -2084,6 +2538,10 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
             <input value={f.iniciais} onChange={e=>s('iniciais',e.target.value.toUpperCase())} placeholder="J.S.A."/></div>
           <div className="num"><label>Idade</label>
             <input type="number" value={f.idade} onChange={e=>s('idade',e.target.value)}/></div>
+          <div className="num"><label>Sexo</label>
+            <select value={f.sexo||''} onChange={e=>s('sexo',e.target.value)}>
+              <option value="">—</option><option value="F">Feminino</option><option value="M">Masculino</option>
+            </select></div>
           <div className="num"><label>Registro</label>
             <input value={f.registro} onChange={e=>s('registro',e.target.value)}/></div>
           <div className="num"><label>Admissão</label>
@@ -2096,6 +2554,10 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
         <div className="campo">
           <span className="campo-lab">Lista de problemas (uma por linha)</span>
           <textarea value={f.problemas} onChange={e=>s('problemas',e.target.value)} style={{minHeight:70}}/>
+        </div>
+        <div className="campo">
+          <span className="campo-lab">Medicações em uso (MUC)</span>
+          <input value={f.muc||''} onChange={e=>s('muc',e.target.value)}/>
         </div>
         <div className="campo">
           <span className="campo-lab">Alergias</span>
@@ -2122,7 +2584,7 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
             onClick={()=>{
               const letras=f.iniciais.replace(/[^A-ZÀ-Ú]/g,'');
               const ini=letras.length&&letras.length<=5&&!f.iniciais.includes('.')?letras.split('').join('.')+'.':f.iniciais;
-              salvar({...f,iniciais:ini});
+              salvar({...f,iniciais:ini,...(editando?{}:extras())});
               fechar();
             }}>
             {editando?'Salvar':'Adicionar ao quadro'}
@@ -2408,8 +2870,8 @@ function App(){
   };
 
   const salvar=p=>nuvem.salvarPaciente(user.uid,p).catch(e=>{console.error(e);setToast('não foi possível salvar');});
-  const criar=f=>salvar({...f,id:uid_(),status:'ativo',evolucoes:[],pendencias:[],fotos:[],dispositivos:[],antibioticos:[],
-    equipeId:escopo==='pessoal'?null:escopo,criadoEm:Date.now()});
+  const criar=f=>salvar({id:uid_(),status:'ativo',evolucoes:[],pendencias:[],fotos:[],dispositivos:[],antibioticos:[],
+    equipeId:escopo==='pessoal'?null:escopo,criadoEm:Date.now(),...f});
   const autor=user.email;
   const arquivar=p=>{ if(!confirm('Dar alta / arquivar '+p.iniciais+'?')) return; salvar({...p,arquivado:true,arquivadoEm:Date.now()}); setNav({tela:'quadro'}); setToast('arquivado'); };
   const remover=p=>{ if(!confirm('Excluir '+p.iniciais+' e todas as evoluções e fotos? Não dá para desfazer.')) return;
@@ -2450,18 +2912,13 @@ function App(){
       {nav.tela==='evo' && atual &&
         <Evolucao p={atual} tipo={nav.tipo} autor={autor} ir={setNav} atualizar={salvar} aviso={setToast} largo={largo} proximo={irProximo}/>}
       {nav.tela==='plantao' &&
-        <div className="form"><Folha texto={gerarPassagem(ativos,perfil)}/></div>}
+        <Plantao pacientes={ativos} perfil={perfil} unidade={usuario.unidade||''} salvar={salvar} aviso={setToast}
+          voltar={()=>setNav({tela:'quadro'})}/>}
 
       {nav.tela==='quadro' &&
         <div className="barra">
           <button className="btn sec" onClick={()=>setNav({tela:'plantao'})}>Passagem de plantão</button>
           <button className="btn" onClick={()=>setModal('novo')}>Novo paciente</button>
-        </div>}
-      {nav.tela==='plantao' &&
-        <div className="barra">
-          <button className="btn sec" onClick={()=>setNav({tela:'quadro'})}>Voltar</button>
-          <button className="btn sec" onClick={async()=>setToast(await copiar(gerarPassagem(ativos,perfil))?'copiado':'falhou')}>Copiar</button>
-          <button className="btn" onClick={()=>compartilhar(gerarPassagem(ativos,perfil),'Passagem de plantão')}>Enviar ao preceptor</button>
         </div>}
 
       {destino &&
