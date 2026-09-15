@@ -1,0 +1,26 @@
+{
+  "name": "Ronda — evolução à beira do leito",
+  "short_name": "Ronda",
+  "description": "Quadro de pacientes e evolução clínica gerada por toques, para médicos e enfermeiros.",
+  "start_url": "./ronda-mvp.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E7EDE8",
+  "theme_color": "#1E6B58",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
