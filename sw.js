@@ -1,6 +1,6 @@
 // Ronda — service worker minimo: deixa o app abrir sem internet.
 // Os dados vem do cache do Firestore (persistencia offline ligada no app).
-const CACHE='ronda-v1';
+const CACHE='ronda-v4';
 const ARQ=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ARQ))); self.skipWaiting(); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))); self.clients.claim(); });
