@@ -187,6 +187,24 @@
     border:1px solid #EBD5B4;border-radius:8px;padding:10px 12px;margin-top:12px}
   .aviso.alerta{background:var(--vermelho-claro);border-color:#E9C4C1;
     color:var(--vermelho);font-weight:600}
+  .evo-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .evo-acoes{display:flex;gap:6px;flex-wrap:wrap}
+  .link{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--verde);font-weight:700;padding:6px 8px;border-radius:6px;background:var(--verde-claro)}
+  .passos{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .passos::-webkit-scrollbar{display:none}
+  .passo{flex:0 0 auto;width:34px;height:34px;border-radius:999px;border:1px solid var(--linha);
+    background:var(--superficie);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:12px;font-weight:700;color:var(--tinta-fraca)}
+  .passo[data-ok="1"]{background:var(--verde-claro);border-color:var(--verde);color:var(--verde)}
+  .passo[data-on="1"]{background:var(--tinta);border-color:var(--tinta);color:#fff;transform:scale(1.08)}
+  .passo-tit{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;display:flex;
+    justify-content:space-between;align-items:baseline}
+  .passo-tit small{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--tinta-fraca);font-weight:600}
+  @media(max-width:899px){
+    .op{padding:12px 15px;font-size:14.5px}       /* alvo de toque maior */
+    .form fieldset{margin-bottom:8px}
+  }
   .campo-pa{flex:1 1 100%}
   .pa-linha{display:flex;align-items:center;gap:8px}
   .pa-linha input{width:88px;flex:0 0 auto;text-align:center;font-family:var(--mono);font-size:16px}
@@ -228,6 +246,7 @@
     grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;
     transition:border-color .12s,transform .12s}
   .perfil:hover{border-color:var(--verde)}
+  .perfil[data-on="1"]{border-color:var(--verde);background:var(--verde-claro)}
   .perfil:active{transform:scale(.99)}
   .perfil-emoji{grid-row:1/3;font-size:32px;align-self:center}
   .perfil-nome{font-weight:700;font-size:17px;letter-spacing:-.01em}
@@ -307,15 +326,49 @@ const storage = firebase.storage();
 // Cache local + fila de escrita offline: Wi-Fi de enfermaria cai, o app nao.
 store.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
-const COL_PAC='ronda_pacientes', COL_USU='ronda_usuarios';
+const COL_PAC='ronda_pacientes', COL_USU='ronda_usuarios', COL_EQ='ronda_equipes', COL_CONV='ronda_convites';
+const mapa=s=>s.docs.map(d=>({id:d.id,...d.data()}));
+const gerarCodigo=()=>{ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c=''; for(let i=0;i<6;i++) c+=a[Math.floor(Math.random()*a.length)]; return c; };
 const nuvem = {
-  ouvir(uid,cb,erro){
-    return store.collection(COL_PAC).where('userId','==',uid)
-      .onSnapshot(s=>cb(s.docs.map(d=>({id:d.id,...d.data()}))), erro);
+  // Meus pacientes (inclusive os que coloquei em equipes)
+  ouvirMeus(uid,cb,erro){
+    return store.collection(COL_PAC).where('userId','==',uid).onSnapshot(s=>cb(mapa(s)), erro);
+  },
+  // Pacientes de uma equipe (criados por qualquer membro)
+  ouvirEquipe(equipeId,cb,erro){
+    return store.collection(COL_PAC).where('equipeId','==',equipeId).onSnapshot(s=>cb(mapa(s)), erro);
+  },
+  // Equipes das quais sou membro
+  ouvirEquipes(uid,cb,erro){
+    return store.collection(COL_EQ).where('membros','array-contains',uid).onSnapshot(s=>cb(mapa(s)), erro);
+  },
+  async criarEquipe(uid,email,nome){
+    const codigo=gerarCodigo(), ref=store.collection(COL_EQ).doc();
+    const lote=store.batch();
+    lote.set(ref,{nome,codigo,donoUid:uid,membros:[uid],membrosInfo:{[uid]:{email}},criadoEm:Date.now()});
+    lote.set(store.collection(COL_CONV).doc(codigo),{equipeId:ref.id,nome});
+    await lote.commit(); return {id:ref.id,codigo};
+  },
+  async entrarEquipe(codigo,uid,email){
+    const c=await store.collection(COL_CONV).doc(codigo.trim().toUpperCase()).get();
+    if(!c.exists) throw new Error('Código não encontrado.');
+    const {equipeId,nome}=c.data();
+    await store.collection(COL_EQ).doc(equipeId).update({
+      membros:firebase.firestore.FieldValue.arrayUnion(uid),
+      ['membrosInfo.'+uid]:{email},
+    });
+    return nome;
+  },
+  sairEquipe(equipeId,uid){
+    return store.collection(COL_EQ).doc(equipeId).update({
+      membros:firebase.firestore.FieldValue.arrayRemove(uid),
+      ['membrosInfo.'+uid]:firebase.firestore.FieldValue.delete(),
+    });
   },
   salvarPaciente(uid,p){
     const {id,...dados}=p;
-    return store.collection(COL_PAC).doc(id).set({...dados,userId:uid,atualizadoEm:Date.now()});
+    // quem criou continua dono; membro da equipe edita sem tomar a posse
+    return store.collection(COL_PAC).doc(id).set({...dados,userId:dados.userId||uid,equipeId:dados.equipeId||null,atualizadoEm:Date.now()});
   },
   removerPaciente(id){ return store.collection(COL_PAC).doc(id).delete(); },
   async lerUsuario(uid){ const d=await store.collection(COL_USU).doc(uid).get(); return d.exists?d.data():null; },
@@ -1441,7 +1494,7 @@ function visivel(c,v){
   const atual=v[c.dep.campo];
   return Array.isArray(atual) ? atual.some(x=>alvo.includes(x)) : alvo.includes(atual);
 }
-function Secao({sec,v,set}){
+function Secao({sec,v,set,semTitulo}){
   const campos=sec.campos.filter(c=>visivel(c,v));
   const blocos=[]; let linha=[];
   campos.forEach(c=>{
@@ -1452,7 +1505,7 @@ function Secao({sec,v,set}){
   if(linha.length) blocos.push({linha});
   return (
     <fieldset>
-      <legend>{sec.tit}</legend>
+      {!semTitulo && <legend>{sec.tit}</legend>}
       {blocos.map((b,i)=> b.campo
         ? <Campo key={b.campo.id} c={b.campo} v={v} set={set}/>
         : <div className="linha-num" key={'l'+i}>
@@ -1549,7 +1602,7 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro}){
 }
 
 /* ---------- Ficha ---------- */
-function Ficha({p,perfil,uid,ir,atualizar,aviso,editar,arquivar,remover}){
+function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,remover}){
   const arquivo=useRef(null);
   const [nota,setNota]=useState('');
   const [addDisp,setAddDisp]=useState(null);   // {tipo,local,desde}
@@ -1586,7 +1639,7 @@ function Ficha({p,perfil,uid,ir,atualizar,aviso,editar,arquivar,remover}){
   }
   function salvarNota(){
     const t=nota.trim(); if(!t) return;
-    atualizar({...p, evolucoes:[{id:uid_(),tipo:'nota',texto:t,resumo:t.slice(0,80),quando:new Date().toISOString()},...(p.evolucoes||[])]});
+    atualizar({...p, evolucoes:[{id:uid_(),tipo:'nota',texto:t,resumo:t.slice(0,80),autor,quando:new Date().toISOString()},...(p.evolucoes||[])]});
     setNota(''); aviso('nota salva');
   }
   function confirmarDisp(){
@@ -1620,6 +1673,7 @@ function Ficha({p,perfil,uid,ir,atualizar,aviso,editar,arquivar,remover}){
           {p.riscoQueda && <span className="pulseira p-queda">Risco de queda</span>}
           {p.lpp && <span className="pulseira p-lpp">LPP</span>}
           {p.status==='uti' && <span className="pulseira p-pend">UTI</span>}
+          {p.equipeId && <span className="pulseira p-dih">👥 {(equipes.find(e=>e.id===p.equipeId)||{}).nome||'equipe'}</span>}
         </div>
         {p.dx && <div className="item"><div className="item-cab"><span>DIAGNÓSTICO</span></div><p>{p.dx}</p></div>}
         {p.problemas && <div className="item"><div className="item-cab"><span>LISTA DE PROBLEMAS</span></div><p>{p.problemas}</p></div>}
@@ -1746,7 +1800,7 @@ function Ficha({p,perfil,uid,ir,atualizar,aviso,editar,arquivar,remover}){
         {minhas.map(e=>(
           <div className="item" key={e.id}>
             <div className="item-cab">
-              <span>{e.tipo==='nota'?'NOTA':'EVOLUÇÃO '+e.tipo.toUpperCase()}</span>
+              <span>{e.tipo==='nota'?'NOTA':'EVOLUÇÃO '+e.tipo.toUpperCase()}{e.autor&&e.autor!==autor?' · '+e.autor.split('@')[0]:''}</span>
               <span>{new Date(e.quando).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
             </div>
             <p>{e.texto}</p>
@@ -1771,24 +1825,78 @@ function Ficha({p,perfil,uid,ir,atualizar,aviso,editar,arquivar,remover}){
       <div className="barra">
         <button className="btn" style={{flex:1}}
           onClick={()=>ir({tela:'evo',id:p.id,tipo:tipoEvo})}>
-          {ehEnf?'Nova evolução de enfermagem':'Nova evolução médica'}
+          {p.rascunho&&p.rascunho.tipo===tipoEvo ? 'Continuar evolução (rascunho)' : (ehEnf?'Nova evolução de enfermagem':'Nova evolução médica')}
         </button>
       </div>
     </>
   );
 }
 
-/* ---------- Construtor de evolução ---------- */
-function Evolucao({p,tipo,ir,atualizar,aviso}){
-  const [v,setV]=useState(()=>prefill(p,tipo));
+/* ---------- Construtor de evolução (passo a passo no celular) ---------- */
+const VITAIS=['pas','pad','fc','fr','tax','sat','hgt','diu','bh','spo2','o2','glasgow','eva','tec','debito','peso'];
+function secaoPreenchida(sec,v){
+  return sec.campos.some(c=>{ const x=v[c.id]; return Array.isArray(x)?x.length>0:(x!==undefined&&x!==''&&x!==null); });
+}
+
+function Evolucao({p,tipo,autor,ir,atualizar,aviso,largo,proximo}){
+  const rasc = p.rascunho && p.rascunho.tipo===tipo ? p.rascunho : null;
+  const [v,setV]=useState(()=> rasc ? rasc.v : prefill(p,tipo));
+  const [recuperado,setRecuperado]=useState(!!rasc);
   const [pronto,setPronto]=useState(false);
   const [extra,setExtra]=useState(false);
   const [uti,setUti]=useState(p.status==='uti');
+  const [passo,setPasso]=useState(0);
+  const [verTudo,setVerTudo]=useState(false);
   const set=(k,val)=>setV(o=>({...o,[k]:val}));
   const esquema = tipo==='enfermagem' ? SAE : SOAP.filter(s=>s.id!=='uti'||uti);
   const texto = useMemo(
     ()=> tipo==='enfermagem'?gerarSAE(p,v,extra):gerarSOAP(p,v,extra),
     [p,v,tipo,extra]);
+  const ultima = (p.evolucoes||[]).find(e=>e.tipo===tipo && e.respostas);
+
+  // Rascunho automatico: 1,5 s depois do ultimo toque, grava no paciente.
+  // Sobrevive a fechar o app e aparece no computador tambem.
+  const primeiro=useRef(true);
+  useEffect(()=>{
+    if(primeiro.current){ primeiro.current=false; return; }
+    const t=setTimeout(()=>{
+      atualizar({...p, rascunho:{tipo, v, quando:new Date().toISOString()}});
+    },1500);
+    return ()=>clearTimeout(t);
+  },[v]); // eslint-disable-line
+
+  function repetirUltima(){
+    if(!ultima) return;
+    const base={...prefill(p,tipo), ...ultima.respostas};
+    VITAIS.forEach(k=>delete base[k]);
+    delete base.sub; delete base.slivre; delete base.efalt; delete base.lab; delete base.img; delete base.obs;
+    setV(base); setRecuperado(false);
+    aviso('copiado da última evolução — confira o que mudou');
+  }
+  function salvarRascunho(){
+    atualizar({...p, rascunho:{tipo, v, quando:new Date().toISOString()}});
+    aviso('salvo');
+    proximo();
+  }
+  function descartar(){
+    if(!confirm('Descartar o rascunho e começar do zero?')) return;
+    setV(prefill(p,tipo)); setRecuperado(false); setPasso(0);
+    atualizar({...p, rascunho:null});
+  }
+  async function salvarFinal(){
+    const ok=await copiar(texto);
+    aviso(ok?'copiado e salvo':'salvo — copie pela linha do tempo');
+    const acha=(esq,id,val)=>{
+      for(const s of esq) for(const c of s.campos)
+        if(c.id===id) return ((c.opts||[]).find(o=>o.v===val)||{}).l;
+    };
+    const resumo=(tipo==='enfermagem'
+      ? (v.consc?acha(SAE,'consc',v.consc):'avaliado')
+      : (v.aval?acha(SOAP,'aval',v.aval):'avaliado'));
+    atualizar({...p, rascunho:null,
+      evolucoes:[{id:uid_(),tipo,texto,resumo,respostas:v,autor,quando:new Date().toISOString()},...(p.evolucoes||[])]});
+    ir({tela:'ficha',id:p.id});
+  }
 
   if(pronto) return (
     <>
@@ -1806,48 +1914,75 @@ function Evolucao({p,tipo,ir,atualizar,aviso}){
       </div>
       <div className="barra">
         <button className="btn sec" onClick={()=>setPronto(false)}>Voltar e ajustar</button>
-        <button className="btn" onClick={async()=>{
-          const ok=await copiar(texto);
-          aviso(ok?'copiado e salvo':'salvo — copie pela linha do tempo');
-          const acha=(esq,id,val)=>{
-            for(const s of esq) for(const c of s.campos)
-              if(c.id===id) return ((c.opts||[]).find(o=>o.v===val)||{}).l;
-          };
-          const resumo=(tipo==='enfermagem'
-            ? (v.consc?acha(SAE,'consc',v.consc):'avaliado')
-            : (v.aval?acha(SOAP,'aval',v.aval):'avaliado'));
-          atualizar({...p, evolucoes:[{id:uid_(),tipo,texto,resumo,quando:new Date().toISOString()},...(p.evolucoes||[])]});
-          ir({tela:'ficha',id:p.id});
-        }}>Copiar e salvar</button>
+        <button className="btn" onClick={salvarFinal}>Copiar e salvar</button>
       </div>
     </>
   );
 
+  const wizard = !largo && !verTudo;
+  const sec = esquema[Math.min(passo,esquema.length-1)];
+  const ultimoPasso = passo>=esquema.length-1;
+
   return (
     <>
-      <div className="form">
-        <div className="ficha-meta" style={{marginBottom:12}}>
-          Leito {p.leito} · {p.iniciais} · evolução {tipo}
+      <div className="form" style={{paddingTop:10}}>
+        <div className="evo-cab">
+          <div className="ficha-meta">Leito {p.leito} · {p.iniciais} · evolução {tipo}</div>
+          <div className="evo-acoes">
+            {ultima && <button className="link" onClick={repetirUltima}>↺ repetir última</button>}
+            <button className="link" onClick={()=>setPronto(true)}>gerar texto</button>
+            {tipo!=='enfermagem' && <button className="link" onClick={()=>setUti(!uti)}>{uti?'✓ UTI':'+ UTI'}</button>}
+            {!largo && <button className="link" onClick={()=>setVerTudo(!verTudo)}>{verTudo?'passo a passo':'ver tudo'}</button>}
+          </div>
         </div>
-        {tipo!=='enfermagem' &&
-          <div className="opcoes" style={{marginBottom:16}}>
-            <button className="op" data-on={uti?'1':'0'} onClick={()=>setUti(!uti)}>
-              {uti?'✓ Campos de UTI ativos':'Mostrar campos de UTI'}</button>
+        {recuperado &&
+          <div className="aviso" style={{marginTop:0,marginBottom:12,display:'flex',gap:10,alignItems:'center'}}>
+            <span style={{flex:1}}>Rascunho de {new Date(rasc.quando).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} recuperado.</span>
+            <button className="link" onClick={descartar}>descartar</button>
           </div>}
-        {esquema.map(sec=><Secao key={sec.id} sec={sec} v={v} set={set}/>)}
+
+        {wizard ? (
+          <>
+            <div className="passos">
+              {esquema.map((s,i)=>(
+                <button key={s.id} className="passo" data-on={i===passo?'1':'0'} data-ok={secaoPreenchida(s,v)?'1':'0'}
+                  onClick={()=>setPasso(i)} aria-label={s.tit}>
+                  <span className="passo-n">{i+1}</span>
+                </button>
+              ))}
+            </div>
+            <div className="passo-tit">{sec.tit}<small>{passo+1} de {esquema.length}</small></div>
+            <Secao key={sec.id} sec={sec} v={v} set={set} semTitulo/>
+          </>
+        ) : esquema.map(s=><Secao key={s.id} sec={s} v={v} set={set}/>)}
       </div>
+
       <div className="barra">
-        <button className="btn sec" onClick={()=>ir({tela:'ficha',id:p.id})}>Cancelar</button>
-        <button className="btn" onClick={()=>setPronto(true)}>Gerar texto</button>
+        {wizard ? (
+          <>
+            <button className="btn sec mono" style={{flex:'0 0 auto',padding:'12px 14px'}} aria-label={passo===0?'voltar à ficha':'passo anterior'}
+              onClick={()=>passo===0?ir({tela:'ficha',id:p.id}):setPasso(passo-1)}>{passo===0?'✕':'‹'}</button>
+            <button className="btn sec" onClick={salvarRascunho}>Salvar</button>
+            {ultimoPasso
+              ? <button className="btn" onClick={()=>setPronto(true)}>Gerar texto</button>
+              : <button className="btn" onClick={()=>setPasso(passo+1)}>Próxima</button>}
+          </>
+        ) : (
+          <>
+            <button className="btn sec mono" style={{flex:'0 0 auto',padding:'12px 14px'}} onClick={()=>ir({tela:'ficha',id:p.id})}>✕</button>
+            <button className="btn sec" onClick={salvarRascunho}>Salvar</button>
+            <button className="btn" onClick={()=>setPronto(true)}>Gerar texto</button>
+          </>
+        )}
       </div>
     </>
   );
 }
 
 /* ---------- Novo / editar paciente ---------- */
-function FormPaciente({inicial,fechar,salvar}){
+function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
   const [f,setF]=useState(()=>({leito:'',iniciais:'',idade:'',registro:'',dx:'',problemas:'',
-    alergia:'',admissao:new Date().toISOString().slice(0,10),riscoQueda:false,lpp:false,...(inicial||{})}));
+    alergia:'',admissao:new Date().toISOString().slice(0,10),riscoQueda:false,lpp:false,equipeId:equipeId||null,...(inicial||{})}));
   const s=(k,val)=>setF(o=>({...o,[k]:val}));
   const editando=!!(inicial&&inicial.id);
   return (
@@ -1878,6 +2013,14 @@ function FormPaciente({inicial,fechar,salvar}){
           <span className="campo-lab">Alergias</span>
           <input value={f.alergia} onChange={e=>s('alergia',e.target.value)} placeholder="deixe em branco se nega"/>
         </div>
+        {equipes&&equipes.length>0 &&
+          <div className="campo">
+            <span className="campo-lab">Quem vê este paciente</span>
+            <select value={f.equipeId||''} onChange={e=>s('equipeId',e.target.value||null)}>
+              <option value="">Só eu</option>
+              {equipes.map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select>
+          </div>}
         <div className="opcoes" style={{marginBottom:16}}>
           <button className="op" data-on={f.riscoQueda?'1':'0'} onClick={()=>s('riscoQueda',!f.riscoQueda)}>Risco de queda</button>
           <button className="op" data-on={f.lpp?'1':'0'} onClick={()=>s('lpp',!f.lpp)}>Lesão por pressão</button>
@@ -1898,6 +2041,65 @@ function FormPaciente({inicial,fechar,salvar}){
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Equipes ---------- */
+function Equipes({equipes,uid,email,aviso,usarEscopo}){
+  const [modo,setModo]=useState(null); // 'criar' | 'entrar'
+  const [txt,setTxt]=useState(''); const [indo,setIndo]=useState(false);
+  async function criar(){
+    if(!txt.trim()) return; setIndo(true);
+    try{ const {id}=await nuvem.criarEquipe(uid,email,txt.trim()); aviso('equipe criada'); setTxt(''); setModo(null); usarEscopo(id); }
+    catch(e){ console.error(e); aviso('não foi possível criar'); }
+    setIndo(false);
+  }
+  async function entrar(){
+    if(!txt.trim()) return; setIndo(true);
+    try{ const nome=await nuvem.entrarEquipe(txt,uid,email); aviso('você entrou em '+nome); setTxt(''); setModo(null); }
+    catch(e){ console.error(e); aviso(e.message.includes('Código')?e.message:'código inválido'); }
+    setIndo(false);
+  }
+  const convite=e=>'https://wa.me/?text='+encodeURIComponent('Entra na minha equipe no Ronda: abre '+location.origin+location.pathname+' → toca no nome no topo → Criar ou entrar numa equipe → código '+e.codigo);
+  return (
+    <div style={{marginBottom:16}}>
+      <span className="campo-lab">Equipes</span>
+      {equipes.length===0 && !modo && <div className="vazio" style={{marginBottom:8}}>Você ainda não está em nenhuma equipe.</div>}
+      {equipes.map(e=>(
+        <div className="item" key={e.id}>
+          <div className="disp-item">
+            <div><b>{e.nome}</b>
+              <div className="item-cab" style={{marginTop:2}}>
+                {Object.values(e.membrosInfo||{}).map(m=>m.email.split('@')[0]).join(', ')}</div></div>
+            <span className="pulseira p-dih">{e.codigo}</span>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:10}}>
+            <a className="btn sec mono" style={{flex:1,textDecoration:'none'}} href={convite(e)} target="_blank" rel="noopener">Convidar</a>
+            <button className="btn sec mono" style={{flex:1}} onClick={async()=>{ await copiar(e.codigo); aviso('código copiado'); }}>Copiar código</button>
+            <button className="btn sec mono" style={{flex:'0 0 auto',color:'var(--vermelho)'}}
+              onClick={()=>{ if(confirm('Sair de '+e.nome+'?')) nuvem.sairEquipe(e.id,uid).then(()=>aviso('você saiu')).catch(()=>aviso('não foi possível sair')); }}>Sair</button>
+          </div>
+        </div>
+      ))}
+      {modo ? (
+        <div className="item">
+          <span className="campo-lab">{modo==='criar'?'Nome da equipe':'Código de 6 letras'}</span>
+          <input value={txt} autoFocus placeholder={modo==='criar'?'ex.: Clínica Médica · Ala B':'ex.: K7M2PX'}
+            onChange={e=>setTxt(modo==='entrar'?e.target.value.toUpperCase():e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&(modo==='criar'?criar():entrar())}/>
+          <div style={{display:'flex',gap:8,marginTop:10}}>
+            <button className="btn sec" style={{flex:1}} onClick={()=>{setModo(null);setTxt('');}}>Cancelar</button>
+            <button className="btn" style={{flex:1}} disabled={indo||!txt.trim()} onClick={modo==='criar'?criar:entrar}>
+              {indo?'…':(modo==='criar'?'Criar':'Entrar')}</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn sec" style={{flex:1}} onClick={()=>setModo('criar')}>Criar equipe</button>
+          <button className="btn sec" style={{flex:1}} onClick={()=>setModo('entrar')}>Entrar com código</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1997,7 +2199,11 @@ function App(){
   const [user,setUser]=useState(undefined);      // undefined = verificando, null = deslogado
   const [bloqueado,setBloqueado]=useState(false);
   const [usuario,setUsuario]=useState(null);     // ronda_usuarios/{uid}: perfil, unidade
-  const [pacientes,setPacientes]=useState(null);
+  const [meus,setMeus]=useState(null);
+  const [equipes,setEquipes]=useState([]);
+  const [porEquipe,setPorEquipe]=useState({});
+  const [escopo,setEscopo]=useState(()=>localStorage.getItem('ronda.escopo')||'pessoal');
+  const [escolherEscopo,setEscolherEscopo]=useState(false);
   const [nav,setNav]=useState({tela:'quadro'});
   const [filtro,setFiltro]=useState('todos');
   const [modal,setModal]=useState(null);         // null | 'novo' | {editar:p}
@@ -2008,7 +2214,7 @@ function App(){
   const inst=usarInstalacao();
 
   useEffect(()=>auth.onAuthStateChanged(async u=>{
-    if(!u){ setUser(null); setUsuario(null); setPacientes(null); setBloqueado(false); return; }
+    if(!u){ setUser(null); setUsuario(null); setMeus(null); setEquipes([]); setPorEquipe({}); setBloqueado(false); return; }
     const ok=await nuvem.autorizado(u.email);
     if(!ok){ setBloqueado(true); setUser(u); return; }
     setBloqueado(false);
@@ -2018,9 +2224,27 @@ function App(){
 
   useEffect(()=>{
     if(!user||bloqueado||!usuario) return;
-    const off=nuvem.ouvir(user.uid, lista=>setPacientes(lista), e=>{console.warn(e);setToast('erro ao sincronizar');});
-    return off;
+    const erro=e=>{console.warn(e);setToast('erro ao sincronizar');};
+    const off1=nuvem.ouvirMeus(user.uid, setMeus, erro);
+    const off2=nuvem.ouvirEquipes(user.uid, setEquipes, erro);
+    return ()=>{off1();off2();};
   },[user,bloqueado,usuario]);
+  const idsEquipes=equipes.map(e=>e.id).sort().join(',');
+  useEffect(()=>{
+    if(!user||bloqueado||!usuario) return;
+    const offs=equipes.map(e=>nuvem.ouvirEquipe(e.id, lista=>setPorEquipe(o=>({...o,[e.id]:lista})), e2=>console.warn(e2)));
+    return ()=>offs.forEach(f=>f());
+  },[idsEquipes,user,bloqueado,usuario]); // eslint-disable-line
+  useEffect(()=>{ localStorage.setItem('ronda.escopo',escopo); },[escopo]);
+  // escopo apontando para equipe que deixei de ver -> volta para o pessoal
+  useEffect(()=>{ if(escopo!=='pessoal'&&equipes.length&&!equipes.find(e=>e.id===escopo)) setEscopo('pessoal'); },[idsEquipes]); // eslint-disable-line
+  // Une tudo sem duplicar (um paciente meu numa equipe aparece nas duas consultas)
+  const pacientes=useMemo(()=>{
+    if(meus===null) return null;
+    const m={}; meus.forEach(p=>m[p.id]=p);
+    Object.values(porEquipe).forEach(l=>l.forEach(p=>m[p.id]=p));
+    return Object.values(m);
+  },[meus,porEquipe]);
 
   // Limpeza automatica dos arquivados antigos (fotos inclusive)
   useEffect(()=>{
@@ -2053,12 +2277,23 @@ function App(){
 
   const perfil=usuario.perfil, ehEnf=perfil==='enfermagem';
   const ordenar=l=>[...l].sort((a,b)=>String(a.leito).localeCompare(String(b.leito),'pt',{numeric:true}));
-  const ativos=ordenar(pacientes.filter(p=>!p.arquivado));
-  const arquivados=ordenar(pacientes.filter(p=>p.arquivado));
+  const noEscopo=p=> escopo==='pessoal' ? !p.equipeId && p.userId===user.uid : p.equipeId===escopo;
+  const equipeAtual=equipes.find(e=>e.id===escopo);
+  const nomeEscopo=escopo==='pessoal'?'Meus pacientes':(equipeAtual?equipeAtual.nome:'…');
+  const ativos=ordenar(pacientes.filter(p=>!p.arquivado&&noEscopo(p)));
+  const arquivados=ordenar(pacientes.filter(p=>p.arquivado&&noEscopo(p)));
   const atual=pacientes.find(p=>p.id===nav.id);
+  const idxAtual=ativos.findIndex(x=>x.id===nav.id);
+  const prox=idxAtual>=0&&idxAtual<ativos.length-1?ativos[idxAtual+1]:null;
+  const irProximo=()=>{
+    if(prox){ setNav({tela:'ficha',id:prox.id}); setToast('próximo: leito '+prox.leito); }
+    else { setNav({tela:'quadro'}); setToast('fim da ronda'); }
+  };
 
   const salvar=p=>nuvem.salvarPaciente(user.uid,p).catch(e=>{console.error(e);setToast('não foi possível salvar');});
-  const criar=f=>salvar({...f,id:uid_(),status:'ativo',evolucoes:[],pendencias:[],fotos:[],dispositivos:[],antibioticos:[],criadoEm:Date.now()});
+  const criar=f=>salvar({...f,id:uid_(),status:'ativo',evolucoes:[],pendencias:[],fotos:[],dispositivos:[],antibioticos:[],
+    equipeId:escopo==='pessoal'?null:escopo,criadoEm:Date.now()});
+  const autor=user.email;
   const arquivar=p=>{ if(!confirm('Dar alta / arquivar '+p.iniciais+'?')) return; salvar({...p,arquivado:true,arquivadoEm:Date.now()}); setNav({tela:'quadro'}); setToast('arquivado'); };
   const remover=p=>{ if(!confirm('Excluir '+p.iniciais+' e todas as evoluções e fotos? Não dá para desfazer.')) return;
     (p.fotos||[]).forEach(f=>nuvem.apagarFoto(f.caminho)); nuvem.removerPaciente(p.id); setNav({tela:'quadro'}); setToast('excluído'); };
@@ -2077,9 +2312,13 @@ function App(){
         {!online && <span className="selo" data-urg="1">offline · salvando no aparelho</span>}
         <div className="topo-sub">
           {nav.tela==='quadro'
-            ? <button className="perfil-tag" onClick={()=>setConfig(true)}>
-                {(usuario.unidade||(ehEnf?'Enfermagem':'Médico'))} ▾</button>
-            : (atual?'Leito '+atual.leito:'')}
+            ? <button className="perfil-tag" onClick={()=>setEscolherEscopo(true)}>
+                {nomeEscopo} ▾</button>
+            : (atual
+                ? (nav.tela==='ficha' && prox
+                    ? <button className="perfil-tag" onClick={irProximo}>Leito {atual.leito} · próximo ›</button>
+                    : 'Leito '+atual.leito)
+                : '')}
         </div>
       </header>
 
@@ -2087,10 +2326,10 @@ function App(){
         <Quadro pacientes={filtro==='arquivados'?arquivados:ativos} totalArquivados={arquivados.length}
           ir={setNav} largo={largo&&filtro!=='arquivados'} filtro={filtro} setFiltro={setFiltro}/>}
       {nav.tela==='ficha' && atual &&
-        <Ficha p={atual} perfil={perfil} uid={user.uid} ir={setNav} atualizar={salvar} aviso={setToast}
+        <Ficha p={atual} perfil={perfil} uid={user.uid} autor={autor} equipes={equipes} ir={setNav} atualizar={salvar} aviso={setToast}
           editar={()=>setModal({editar:atual})} arquivar={()=>arquivar(atual)} remover={()=>remover(atual)}/>}
       {nav.tela==='evo' && atual &&
-        <Evolucao p={atual} tipo={nav.tipo} ir={setNav} atualizar={salvar} aviso={setToast}/>}
+        <Evolucao p={atual} tipo={nav.tipo} autor={autor} ir={setNav} atualizar={salvar} aviso={setToast} largo={largo} proximo={irProximo}/>}
       {nav.tela==='plantao' &&
         <div className="form"><Folha texto={gerarPassagem(ativos,perfil)}/></div>}
 
@@ -2106,8 +2345,29 @@ function App(){
           <button className="btn" onClick={()=>compartilhar(gerarPassagem(ativos,perfil),'Passagem de plantão')}>Enviar ao preceptor</button>
         </div>}
 
-      {modal==='novo' && <FormPaciente fechar={()=>setModal(null)} salvar={criar}/>}
-      {modal&&modal.editar && <FormPaciente inicial={modal.editar} fechar={()=>setModal(null)} salvar={f=>salvar({...modal.editar,...f})}/>}
+      {modal==='novo' && <FormPaciente fechar={()=>setModal(null)} salvar={criar} equipes={equipes} equipeId={escopo==='pessoal'?null:escopo}/>}
+      {modal&&modal.editar && <FormPaciente inicial={modal.editar} fechar={()=>setModal(null)} salvar={f=>salvar({...modal.editar,...f})} equipes={equipes}/>}
+
+      {escolherEscopo &&
+        <div className="fundo" onClick={()=>setEscolherEscopo(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <h2>O que você está vendo</h2>
+            <button className="perfil" onClick={()=>{setEscopo('pessoal');setEscolherEscopo(false);}} data-on={escopo==='pessoal'?'1':'0'}>
+              <span className="perfil-emoji">🗂️</span>
+              <span className="perfil-nome">Meus pacientes</span>
+              <span className="perfil-desc">Só você vê</span>
+            </button>
+            {equipes.map(e=>(
+              <button key={e.id} className="perfil" onClick={()=>{setEscopo(e.id);setEscolherEscopo(false);}} data-on={escopo===e.id?'1':'0'}>
+                <span className="perfil-emoji">👥</span>
+                <span className="perfil-nome">{e.nome}</span>
+                <span className="perfil-desc">{e.membros.length} membro{e.membros.length>1?'s':''} · código {e.codigo}</span>
+              </button>
+            ))}
+            <button className="btn sec" style={{width:'100%',marginTop:6}} onClick={()=>{setEscolherEscopo(false);setConfig(true);}}>
+              Criar ou entrar numa equipe</button>
+          </div>
+        </div>}
 
       {config &&
         <div className="fundo" onClick={()=>setConfig(false)}>
@@ -2117,6 +2377,8 @@ function App(){
             <span className="campo-lab">Nome da unidade (aparece no topo e no plantão)</span>
             <input defaultValue={usuario.unidade||''} placeholder="ex.: Clínica Médica · Ala B"
               onBlur={e=>definirUnidade(e.target.value.trim())} style={{marginBottom:14}}/>
+            <Equipes equipes={equipes} uid={user.uid} email={user.email} aviso={setToast}
+              usarEscopo={id=>{setEscopo(id);setConfig(false);}}/>
             <span className="campo-lab">Perfil de trabalho</span>
             <div className="opcoes" style={{marginBottom:14}}>
               <button className="op" data-on={ehEnf?'1':'0'} onClick={()=>definirPerfil('enfermagem')}>Enfermagem</button>
