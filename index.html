@@ -1339,7 +1339,7 @@ function gerarSAE(p,vBruto,comSAE){
    (titulos de secao, P1./P2., LAB (dd/mm), PAM :, etc.).
    O que nao reconhece, fica como texto. Nada e inventado.
    ============================================================ */
-const TITULOS=/^[ \t]*(Admiss[aã]o[^:\n]{0,30}|HMA|HPP|Hist[oó]ria[^:\n]{0,30}|Lista de problemas|Evolu[cç][aã]o[^:\n]{0,30}|Sinais Vitais|Exame f[ií]sico[^:\n]{0,30}|Exames complementares|Exames[^:\n]{0,30}|Interconsultas?|Pareceres?|Plano[^:\n]{0,40}|Condutas?|Pend[eê]ncia[^:\n]{0,40}|Diagn[oó]sticos?[^:\n]{0,30}|MUC|Medica[cç][oõ]es em uso[^:\n]{0,20})[ \t]*:/gim;
+const TITULOS=/^[ \t]*(Admiss[aã]o[^:\n]{0,30}|HMA|HPP|Hist[oó]ria[^:\n]{0,30}|Lista de problemas|Evolu[cç][aã]o[^:\n]{0,30}|Sinais Vitais|Exame f[ií]sico[^:\n]{0,30}|Exames complementares|Exames[^:\n]{0,30}|Interconsultas?|Pareceres?|Plano[^:\n]{0,40}|Condutas?|Pend[eê]ncia[^:\n]{0,40}|Diagn[oó]sticos?[^:\n]{0,30}|MUC|Medica[cç][oõ]es em uso[^:\n]{0,20}|Antibioticoterapia|Antibi[oó]ticos?|Culturas?|Sum[aá]rio de urina|Exames (?:internos )?de imagem|Exames internos laboratoriais|Imagem)[ \t]*(?::|$)/gim;
 
 function iniciaisDe(nome){
   return nome.trim().split(/\s+/).filter(x=>!/^(de|da|do|dos|das|e)$/i.test(x)).map(x=>x[0].toUpperCase()+'.').join('');
@@ -1357,7 +1357,11 @@ const pega=(obj,re)=>{ const k=Object.keys(obj).find(k=>re.test(k)); return k?ob
 const num=(T,re)=>{ const m=T.match(re); return m?m[1].replace(',','.'):''; };
 
 function lerProntuario(texto){
-  const T=(texto||'').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n');
+  // Texto copiado de sistema web traz espacos invisiveis (nbsp etc.) e virgulas/pontos exoticos: normaliza antes de ler.
+  const T=(texto||'').replace(/\r/g,'')
+    .replace(/[\u00a0\u2007\u202f\u2000-\u200b\ufeff]/g,' ')
+    .replace(/\uff1a/g,':').replace(/[“”]/g,'"').replace(/[‐‑‒–—]/g,'-')
+    .replace(/[ \t]+\n/g,'\n');
   const r={dispositivos:[],antibioticos:[]};
 
   // 1a linha "417.3 NYCOLE" ou "Leito 12A - Maria Silva"
@@ -1366,15 +1370,26 @@ function lerProntuario(texto){
   if(m){ r.leito=m[1]; r.nome=m[2].trim(); r.iniciais=iniciaisDe(r.nome); }
 
   const S=secoes(T);
-  const lp=pega(S,/lista de problemas|diagn/);
+  let lp=pega(S,/lista de problemas|diagn/);
+  if(!lp){ // sem titulo reconhecido: pega as linhas P1./P2. e as sub-hipoteses ">" logo abaixo
+    const ls=T.split('\n'); const ini=ls.findIndex(x=>/^\s*P\d+\./i.test(x));
+    if(ini>=0){ const b=[]; for(let i=ini;i<ls.length;i++){ const x=ls[i].trim(); if(!x) continue;
+      if(/^P\d+\./i.test(x)||/^>/.test(x)) b.push(x); else if(b.length) break; } lp=b.join('\n'); }
+  }
   if(lp){
-    const linhas=lp.split('\n').map(x=>x.trim()).filter(Boolean);
+    const brutas=lp.split('\n').map(x=>x.trim()).filter(Boolean);
+    const linhas=[]; brutas.forEach(x=>{
+      if(/^P\d+\./i.test(x)||/^>/.test(x)||!linhas.length) linhas.push(x);
+      else linhas[linhas.length-1]+=' '+x;          // continuacao do problema anterior
+    });
     r.problemas=linhas.map(x=>x.replace(/^P\d+\.\s*/i,'').replace(/^>\s*/,'  > ')).join('\n');
     const p1=linhas.find(x=>/^P?1\./i.test(x)||!/^>/.test(x));
     if(p1) r.dx=p1.replace(/^P\d+\.\s*/i,'').trim();
   }
-  const muc=T.match(/\bMUC\s*:\s*([^\n]+)/i)||T.match(/medica[cç][oõ]es? em uso[^:\n]*:\s*([^\n]+)/i);
+  const muc=T.match(/\bMUC\s*:\s*([^\n]+)/i)||T.match(/medica[cç][oõ]es? em uso[^:\n]*:\s*([^\n]+)/i)
+    ||T.match(/em uso (?:regular |cr[oô]nico |domiciliar )?de\s+([^.\n]{6,220})/i);
   if(muc) r.muc=muc[1].trim().replace(/\.$/,'');
+  r.imagem=pega(S,/imagem/); r.culturas=pega(S,/cultura/); r.urina=pega(S,/urina/);
   if(/nega\s+alergias?/i.test(T)) r.alergia='';
   else { const al=T.match(/alergi[ao]s?\s*(?:a|:)\s*([^\n.;]+)/i); if(al&&!/nega/i.test(al[0])) r.alergia=al[1].trim(); }
 
@@ -1391,7 +1406,8 @@ function lerProntuario(texto){
   };
   Object.keys(r.vitais).forEach(k=>{ if(!r.vitais[k]) delete r.vitais[k]; });
 
-  const labs=T.split('\n').filter(l=>/\bLAB\b\s*\(|hemograma|EAS\s*\(|sorolog/i.test(l)).map(l=>l.replace(/^[^:]{0,40}laboratoriais\s*:\s*/i,'').trim());
+  const temUrina=/sum[aá]rio de urina/i.test(T);
+  const labs=T.split('\n').filter(l=>/\bLAB\b\s*\(|hemograma|sorolog/i.test(l)||(!temUrina&&/EAS\s*\(/i.test(l))).map(l=>l.replace(/^[^:]{0,40}laboratoriais\s*:\s*/i,'').trim());
   r.lab=labs.join('\n');
   r.exames=pega(S,/exames complementares|^exames/);
   r.interconsultas=pega(S,/interconsulta|parecer/);
@@ -1408,11 +1424,21 @@ function lerProntuario(texto){
   disp.forEach(([re,v])=>{ if(re.test(T)) r.dispositivos.push({tipo:v,local:'',desde:''}); });
   const atbRe=/\b(ceftriaxona|cefepime|cefazolina|cefalexina|cefuroxima|ceftazidima|piperacilina[- ]tazobactam|pipe[- ]?tazo|meropenem|imipenem|ertapenem|vancomicina|teicoplanina|linezolida|oxacilina|ampicilina(?:[- ]sulbactam)?|amoxicilina(?:[- ]clavulanato)?|azitromicina|claritromicina|ciprofloxacino|levofloxacino|moxifloxacino|metronidazol|clindamicina|sulfametoxazol[- ]trimetoprim|polimixina|amicacina|gentamicina|daptomicina|tigeciclina|fluconazol|anfotericina|aciclovir|oseltamivir)\b[^\n;,]{0,25}/gi;
   const vistos=new Set();
-  (T.match(atbRe)||[]).forEach(x=>{ const n=x.trim().replace(/\s+/g,' '); const k=n.toLowerCase().split(' ')[0]; if(!vistos.has(k)){ vistos.add(k); r.antibioticos.push({nome:n,desde:''}); } });
+  const anoAtual=new Date().getFullYear();
+  const dataDI=(txt)=>{ const m=txt.match(/\bD\.?I\.?\s*:?\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i)||txt.match(/in[ií]cio\s*:?\s*(\d{1,2})\/(\d{1,2})/i);
+    if(!m) return ''; let y=m[3]?(m[3].length===2?'20'+m[3]:m[3]):String(anoAtual);
+    let iso=y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); if(new Date(iso)>new Date()) iso=(Number(y)-1)+iso.slice(4); return iso; };
+  (T.match(atbRe)||[]).forEach(x=>{
+    const nome=x.trim().split(/\s*[(\-–]/)[0].replace(/\s+/g,' ').trim();
+    const k=nome.toLowerCase().split(' ')[0]; if(vistos.has(k)) return; vistos.add(k);
+    const dose=(x.match(/\d+\s*(?:mg|g|mcg|UI)\b[^(\n]*/i)||[''])[0].trim();
+    r.antibioticos.push({nome:nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase()+(dose?' '+dose:''),desde:dataDI(x)});
+  });
 
   r.reconhecido=[r.leito&&'leito',r.iniciais&&'iniciais',r.problemas&&'problemas',r.muc&&'MUC',
     Object.keys(r.vitais).length&&'sinais vitais',r.lab&&'laboratório',r.interconsultas&&'interconsultas',
-    r.plano&&'plano',r.pendenciaAlta&&'pendência de alta',r.dispositivos.length&&'dispositivos',r.antibioticos.length&&'antibióticos'].filter(Boolean);
+    r.plano&&'plano',r.pendenciaAlta&&'pendência de alta',r.dispositivos.length&&'dispositivos',r.antibioticos.length&&'antibióticos',
+    r.imagem&&'imagem',r.culturas&&'culturas'].filter(Boolean);
   return r;
 }
 // Troca o nome completo pelas iniciais em todo o texto antes de salvar.
@@ -1462,7 +1488,7 @@ function prefill(p,tipo){
     if(p.problemas) v.problemas=p.problemas.split('\n').map(x=>x.trim()).filter(Boolean).join('; ');
     const imp=p.importado||{};
     v.labData=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
-    if(imp.plano) v.plivre=imp.plano.split('\n').map(x=>x.replace(/^[-–>]\s*/,'').trim()).filter(Boolean).join('\n');
+    if(imp.plano) v.plivre=imp.plano.split('\n').map(x=>x.replace(/^[-–]\s*/,'').trim()).filter(Boolean).join('\n');
   }
   return v;
 }
@@ -1596,11 +1622,16 @@ function gerarHospitalar(p,vBruto){
   L.push('Exames complementares:');
   L.push('Exames internos laboratoriais:');
   if(labs.length) labs.forEach(x=>L.push(x)); else L.push('- ');
-  if(v.img||(p.importado&&p.importado.exames&&/imagem/i.test(p.importado.exames))){
-    L.push('Exames de imagem:');
+  const imgAnt=(p.importado&&p.importado.imagem)||'', culAnt=(p.importado&&p.importado.culturas)||'', uri=(p.importado&&p.importado.urina)||'';
+  if(uri){ L.push('Sumário de urina:'); L.push(uri.trim()); }
+  if(v.img||imgAnt){
+    L.push('Exames internos de imagem:');
     if(v.img) L.push('- '+v.img.trim());
+    if(imgAnt) L.push(imgAnt.trim());
   }
-  if(v.cult){ L.push('Culturas:'); L.push('- '+v.cult.trim()); }
+  if(antibioticosTexto(p)){ L.push('Antibioticoterapia:'); (p.antibioticos||[]).forEach(a=>{ const n=diasDesde(a.desde);
+    L.push('- '+a.nome.toUpperCase()+(a.desde?' (DI '+new Date(a.desde+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+(n?' - D'+n:'')+' - EM USO)':'')); }); }
+  if(v.cult||culAnt){ L.push('Culturas:'); if(v.cult) L.push('- '+v.cult.trim()); if(culAnt) L.push(culAnt.trim()); }
   L.push('');
   // Interconsultas
   const icAnt=(p.importado&&p.importado.interconsultas)||'';
@@ -1616,7 +1647,11 @@ function gerarHospitalar(p,vBruto){
   const plano=(v.plano||[]).map(k=>{ const o=SOAP.find(s=>s.id==='p').campos[0].opts.find(o=>o.v===k); if(!o) return '';
     let t=o.h||o.t; if(k==='atb'&&atbs) t+=': '+atbs; return t; }).filter(Boolean);
   plano.forEach(x=>L.push('- '+x));
-  if(v.plivre) v.plivre.split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>L.push('- '+x.replace(/^[-–>]\s*/,'')));
+  if(v.plivre) v.plivre.split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>{
+    if(/:$/.test(x)) L.push(x);                                  // cabecalho: "Acompanhamento com Neurologia:"
+    else if(/^>/.test(x)) L.push('   > '+x.replace(/^>\s*/,'')); // sub-conduta
+    else L.push('- '+x.replace(/^[-–]\s*/,''));
+  });
   if(dsp) L.push('- Dispositivos: '+dsp);
   L.push('');
   // Pendencia para alta
@@ -2125,7 +2160,7 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
     const novo={...p,
       problemas:r.problemas||p.problemas||'', dx:p.dx||r.dx||'', muc:r.muc||p.muc||'',
       alergia:p.alergia||r.alergia||'',
-      importado:{lab:r.lab||'',exames:r.exames||'',interconsultas:r.interconsultas||'',plano:r.plano||'',vitais:r.vitais||{},quando:new Date().toISOString()},
+      importado:{lab:r.lab||'',exames:r.exames||'',imagem:r.imagem||'',culturas:r.culturas||'',urina:r.urina||'',admissao:r.admissao||'',evolucao:r.evolucao||'',interconsultas:r.interconsultas||'',plano:r.plano||'',vitais:r.vitais||{},quando:new Date().toISOString()},
       dispositivos:[...(p.dispositivos||[]),...r.dispositivos.filter(d=>!jaTem(d.tipo)).map(d=>({id:uid_(),...d}))],
       antibioticos:[...(p.antibioticos||[]),...r.antibioticos.filter(a=>!jaAtb(a.nome)).map(a=>({id:uid_(),...a}))],
       pendencias:[...(p.pendencias||[]),...(r.pendenciaAlta&&!(p.pendencias||[]).some(x=>x.texto===r.pendenciaAlta)?[{id:uid_(),texto:r.pendenciaAlta,feito:false,criadoEm:Date.now()}]:[])],
@@ -2364,6 +2399,8 @@ function ResumoCaso({p}){
         {tudo?ultEvo.texto:ultEvo.resumo}</Bloco>}
       {tudo && <Bloco t="Admissão">{imp.admissao}</Bloco>}
       {tudo && <Bloco t="Interconsultas">{imp.interconsultas}</Bloco>}
+      {tudo && <Bloco t="Imagem">{imp.imagem}</Bloco>}
+      {tudo && <Bloco t="Culturas">{imp.culturas}</Bloco>}
       <Bloco t="Plano vigente">{tudo?imp.plano:(imp.plano||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,3).join(' · ')}</Bloco>
       {abertas.length>0 && <Bloco t="Pendente">{abertas.map(x=>x.texto).join(' · ')}</Bloco>}
       {p.proximoPlantao && <Bloco t="Para o próximo plantão">{p.proximoPlantao}</Bloco>}
@@ -2543,7 +2580,7 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
     if(!lido) return {};
     const texto=anonimizar(txt.trim(),lido.nome,lido.iniciais);
     return {
-      importado:{lab:lido.lab||'',exames:lido.exames||'',interconsultas:lido.interconsultas||'',plano:lido.plano||'',vitais:lido.vitais||{},quando:new Date().toISOString()},
+      importado:{lab:lido.lab||'',exames:lido.exames||'',imagem:lido.imagem||'',culturas:lido.culturas||'',urina:lido.urina||'',admissao:lido.admissao||'',evolucao:lido.evolucao||'',interconsultas:lido.interconsultas||'',plano:lido.plano||'',vitais:lido.vitais||{},quando:new Date().toISOString()},
       dispositivos:lido.dispositivos.map(d=>({id:uid_(),...d})),
       antibioticos:lido.antibioticos.map(a=>({id:uid_(),...a})),
       pendencias:lido.pendenciaAlta?[{id:uid_(),texto:lido.pendenciaAlta,feito:false,criadoEm:Date.now()}]:[],
