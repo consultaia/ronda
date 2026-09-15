@@ -71,21 +71,30 @@
 
   /* ---------- quadro ---------- */
   .quadro{flex:1;padding:0 16px 100px}
-  .colunas{display:flex;gap:14px;overflow-x:auto;padding-bottom:16px;align-items:flex-start}
-  .coluna{flex:0 0 300px;background:rgba(255,255,255,.5);border:1px solid var(--linha);
-    border-radius:var(--raio);padding:10px}
+  .colunas{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding-bottom:16px;
+    align-items:stretch;min-height:calc(100dvh - 230px)}
+  @media(max-width:1180px){.colunas{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .coluna{background:rgba(255,255,255,.5);border:1px solid var(--linha);border-radius:var(--raio);
+    padding:10px;min-width:0;transition:background .12s,border-color .12s}
+  .lista-larga{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start}
   .coluna-tit{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--tinta-fraca);padding:2px 4px 10px;display:flex;justify-content:space-between}
+    color:var(--tinta-fraca);padding:2px 4px 10px;display:flex;justify-content:space-between;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .coluna .vazio{padding:22px 10px;font-size:12.5px}
 
   .cartao{
     width:100%;text-align:left;background:var(--superficie);border:1px solid var(--linha);
-    border-radius:var(--raio);padding:12px 14px;margin-bottom:10px;display:flex;gap:13px;
-    align-items:flex-start;transition:border-color .12s,transform .12s;
+    border-radius:var(--raio);padding:12px 12px;margin-bottom:10px;display:flex;gap:11px;
+    align-items:flex-start;transition:border-color .12s,transform .12s,opacity .12s;cursor:pointer;position:relative;
   }
+  .estrela{position:absolute;top:6px;right:8px;font-size:18px;line-height:1;color:var(--tinta-fraca);padding:4px}
+  .estrela[data-on="1"]{color:var(--ambar)}
+  .aba.arq{border-style:dashed;color:var(--tinta-fraca)}
+  .aba.arq[data-on="1"]{background:var(--tinta);color:#fff;border-style:solid}
   .cartao:hover{border-color:var(--verde)}
   .cartao:active{transform:scale(.995)}
   .leito{
-    flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:17px;letter-spacing:-.02em;
+    flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:-.02em;
     background:var(--papel);border:1px solid var(--linha);border-radius:7px;
     padding:7px 9px;min-width:52px;text-align:center;line-height:1.1;
   }
@@ -1555,12 +1564,13 @@ function Folha({texto}){
 }
 
 /* ---------- Quadro ---------- */
-function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
-                 escopos,escopo,setEscopo,moverEscopo,moverStatus,novaEquipe}){
+function Quadro({pacientes,arquivados,ir,largo,filtro,setFiltro,uid,equipes,
+                 escopos,escopo,setEscopo,moverEscopo,moverStatus,novaEquipe,seguir}){
   const contar=s=>pacientes.filter(p=>p.status===s).length;
-  const [arrastando,setArrastando]=useState(null);   // id do paciente
-  const [sobre,setSobre]=useState(null);             // alvo destacado
-  const porId=id=>pacientes.find(p=>p.id===id);
+  const [arrastando,setArrastando]=useState(null);
+  const [sobre,setSobre]=useState(null);
+  const porId=id=>pacientes.find(p=>p.id===id)||arquivados.find(p=>p.id===id);
+  const nomeEquipe=id=>(equipes.find(e=>e.id===id)||{}).nome||'equipe';
 
   const dragProps=p=>({
     draggable:true,
@@ -1569,21 +1579,26 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
   });
   const dropProps=(alvo,acao)=>({
     onDragOver:e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; if(sobre!==alvo) setSobre(alvo); },
-    onDragLeave:()=>{ if(sobre===alvo) setSobre(null); },
+    onDragLeave:e=>{ if(!e.currentTarget.contains(e.relatedTarget) && sobre===alvo) setSobre(null); },
     onDrop:e=>{ e.preventDefault(); const id=e.dataTransfer.getData('text/plain')||arrastando; const p=porId(id);
                 setSobre(null); setArrastando(null); if(p) acao(p); },
   });
 
-  const Cartao=({p})=>{
+  // Funcoes de render (nao componentes): nao remontam a cada estado, entao o arrastar nao quebra.
+  const cartao=p=>{
     const dih=diasDe(p.admissao);
     const pend=(p.pendencias||[]).filter(x=>!x.feito).length;
     const nd=(p.dispositivos||[]).length;
+    const segue=(p.seguidores||[]).includes(uid);
     return (
-      <button className="cartao" data-arrastando={arrastando===p.id?'1':'0'} {...(largo?dragProps(p):{})}
-        onClick={()=>ir({tela:'ficha',id:p.id})}>
+      <div className="cartao" key={p.id} data-arrastando={arrastando===p.id?'1':'0'} {...(largo?dragProps(p):{})}
+        role="button" tabIndex={0} onClick={()=>ir({tela:'ficha',id:p.id})}
+        onKeyDown={e=>e.key==='Enter'&&ir({tela:'ficha',id:p.id})}>
         <div className="leito"><small>LEITO</small>{p.leito}</div>
         <div className="cartao-corpo">
-          <div className="cartao-nome">{p.iniciais}<em>{p.idade?p.idade+'a':''}</em></div>
+          <div className="cartao-nome">{p.iniciais}<em>{p.idade?p.idade+'a':''}</em>
+            {escopo==='pessoal' && p.equipeId && <span className="pulseira p-dih" style={{marginLeft:6}}>👥 {nomeEquipe(p.equipeId)}</span>}
+          </div>
           <div className="cartao-dx">{p.dx||'sem diagnóstico registrado'}</div>
           <div className="pulseiras">
             {dih && <span className="pulseira p-dih">{dih}º DIH</span>}
@@ -1594,16 +1609,18 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
             {nd>0 && <span className="pulseira p-pend">{nd} dispositivo{nd>1?'s':''}</span>}
           </div>
         </div>
-      </button>
+        {escopo!=='pessoal' && p.userId!==uid &&
+          <button className="estrela" data-on={segue?'1':'0'} title={segue?'Sai da sua aba':'Mostrar em Meus pacientes'}
+            onClick={e=>{e.stopPropagation();seguir(p);}}>{segue?'★':'☆'}</button>}
+      </div>
     );
   };
 
-  // Abas de ambiente: Meus pacientes + equipes. No computador, tambem sao alvos de soltar.
-  const Abas=()=>(
+  const abas=(
     <div className="abas">
       {escopos.map(e=>(
         <button key={e.id} className="aba" data-on={escopo===e.id?'1':'0'} data-sobre={sobre==='aba:'+e.id?'1':'0'}
-          onClick={()=>setEscopo(e.id)}
+          onClick={()=>{setEscopo(e.id); if(filtro==='arquivados') setFiltro('todos');}}
           {...(largo?dropProps('aba:'+e.id, p=>moverEscopo(p,e.id)):{})}>
           <span className="aba-ico">{e.id==='pessoal'?'🗂️':'👥'}</span>
           <span>{e.nome}</span>
@@ -1611,37 +1628,37 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
         </button>
       ))}
       <button className="aba nova" onClick={novaEquipe}>+ equipe</button>
-      {largo && arrastando && <span className="aba-dica">solte numa aba para mover de ambiente</span>}
+      <span style={{flex:1}}/>
+      {largo && arrastando
+        ? <span className="aba-dica">solte numa coluna (situação) ou numa aba (ambiente)</span>
+        : <button className="aba arq" data-on={filtro==='arquivados'?'1':'0'} onClick={()=>setFiltro(filtro==='arquivados'?'todos':'arquivados')}>
+            Arquivados <b>{arquivados.length}</b></button>}
     </div>
   );
 
   if(largo) return (
     <div className="quadro">
-      <Abas/>
-      <div className="chips" style={{padding:'0 0 10px'}}>
-        <button className="chip" data-on={filtro==='arquivados'?'1':'0'} onClick={()=>setFiltro(filtro==='arquivados'?'todos':'arquivados')}>
-          Arquivados<b>{totalArquivados}</b></button>
-      </div>
+      {abas}
       {filtro==='arquivados'
-        ? <div>{pacientes.map(p=><Cartao key={p.id} p={p}/>)}
-            {pacientes.length===0 && <div className="vazio">Nenhum arquivado.</div>}</div>
+        ? <div className="lista-larga">{arquivados.map(cartao)}
+            {arquivados.length===0 && <div className="vazio">Nenhum arquivado neste ambiente.</div>}</div>
         : <div className="colunas">
             {STATUS.map(s=>(
               <div className="coluna" key={s.v} data-sobre={sobre==='col:'+s.v?'1':'0'}
                 {...dropProps('col:'+s.v, p=>p.status!==s.v&&moverStatus(p,s.v))}>
                 <div className="coluna-tit"><span>{s.l}</span><span>{contar(s.v)}</span></div>
-                {pacientes.filter(p=>p.status===s.v).map(p=><Cartao key={p.id} p={p}/>)}
-                {contar(s.v)===0 && <div className="vazio">{arrastando?'Solte aqui':'Nenhum paciente aqui.'}</div>}
+                {pacientes.filter(p=>p.status===s.v).map(cartao)}
+                {contar(s.v)===0 && <div className="vazio">{arrastando?'Solte aqui':'—'}</div>}
               </div>
             ))}
           </div>}
     </div>
   );
 
-  const lista=(filtro==='todos'||filtro==='arquivados')?pacientes:pacientes.filter(p=>p.status===filtro);
+  const lista=filtro==='arquivados'?arquivados:(filtro==='todos'?pacientes:pacientes.filter(p=>p.status===filtro));
   return (
     <>
-      <div style={{padding:'10px 16px 0'}}><Abas/></div>
+      <div style={{padding:'10px 16px 0'}}>{abas}</div>
       <div className="chips">
         <button className="chip" data-on={filtro==='todos'?'1':'0'} onClick={()=>setFiltro('todos')}>
           Todos<b>{pacientes.length}</b></button>
@@ -1649,11 +1666,9 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
           <button key={s.v} className="chip" data-on={filtro===s.v?'1':'0'} onClick={()=>setFiltro(s.v)}>
             {s.l}<b>{contar(s.v)}</b></button>
         ))}
-        <button className="chip" data-on={filtro==='arquivados'?'1':'0'} onClick={()=>setFiltro('arquivados')}>
-          Arquivados<b>{totalArquivados}</b></button>
       </div>
       <div className="quadro">
-        {lista.map(p=><Cartao key={p.id} p={p}/>)}
+        {lista.map(cartao)}
         {lista.length===0 && <div className="vazio">Nenhum paciente aqui. Toque em “Novo paciente” para começar.</div>}
       </div>
     </>
@@ -1661,7 +1676,7 @@ function Quadro({pacientes,totalArquivados,ir,largo,filtro,setFiltro,
 }
 
 /* ---------- Ficha ---------- */
-function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,remover,moverEscopo}){
+function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,remover,moverEscopo,seguir}){
   const arquivo=useRef(null);
   const [nota,setNota]=useState('');
   const [addDisp,setAddDisp]=useState(null);   // {tipo,local,desde}
@@ -1738,13 +1753,17 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
         {p.problemas && <div className="item"><div className="item-cab"><span>LISTA DE PROBLEMAS</span></div><p>{p.problemas}</p></div>}
 
         {equipes.length>0 && <>
-          <div className="secao-tit"><span>Quem vê este paciente</span></div>
+          <div className="secao-tit"><span>Ambiente</span></div>
           <div className="opcoes">
             <button className="op" data-on={!p.equipeId?'1':'0'} onClick={()=>moverEscopo(p,'pessoal')}>🗂️ Só eu</button>
             {equipes.map(e=>(
               <button key={e.id} className="op" data-on={p.equipeId===e.id?'1':'0'} onClick={()=>moverEscopo(p,e.id)}>👥 {e.nome}</button>
             ))}
+            {p.equipeId && p.userId!==uid &&
+              <button className="op" data-on={(p.seguidores||[]).includes(uid)?'1':'0'} onClick={()=>seguir(p)}>
+                {(p.seguidores||[]).includes(uid)?'★ Em Meus pacientes':'☆ Mostrar em Meus pacientes'}</button>}
           </div>
+          {p.equipeId && p.userId===uid && <div className="aviso" style={{marginTop:8}}>Criado por você: continua na sua aba mesmo estando na equipe.</div>}
         </>}
         <div className="secao-tit"><span>Situação no quadro</span></div>
         <div className="opcoes">
@@ -2344,12 +2363,16 @@ function App(){
 
   const perfil=usuario.perfil, ehEnf=perfil==='enfermagem';
   const ordenar=l=>[...l].sort((a,b)=>String(a.leito).localeCompare(String(b.leito),'pt',{numeric:true}));
-  const noEscopo=p=> escopo==='pessoal' ? !p.equipeId && p.userId===user.uid : p.equipeId===escopo;
-  const escopos=[{id:'pessoal',nome:'Meus pacientes',total:pacientes.filter(p=>!p.arquivado&&!p.equipeId&&p.userId===user.uid).length},
+  const meu=p=> p.userId===user.uid || (p.seguidores||[]).includes(user.uid);
+  const noEscopo=p=> escopo==='pessoal' ? meu(p) : p.equipeId===escopo;
+  const escopos=[{id:'pessoal',nome:'Meus pacientes',total:pacientes.filter(p=>!p.arquivado&&meu(p)).length},
     ...equipes.map(e=>({id:e.id,nome:e.nome,total:pacientes.filter(p=>!p.arquivado&&p.equipeId===e.id).length}))];
   const moverEscopo=(p,id)=>{ const eq=id==='pessoal'?null:id; if((p.equipeId||null)===eq) return;
     salvar({...p,equipeId:eq}); setToast(eq?'movido para '+(equipes.find(e=>e.id===eq)||{}).nome:'movido para Meus pacientes'); };
   const moverStatus=(p,st)=>salvar({...p,status:st});
+  const seguir=p=>{ const seg=p.seguidores||[]; const on=seg.includes(user.uid);
+    salvar({...p,seguidores:on?seg.filter(x=>x!==user.uid):[...seg,user.uid]});
+    setToast(on?'saiu da sua aba':'agora aparece em Meus pacientes'); };
   const ativos=ordenar(pacientes.filter(p=>!p.arquivado&&noEscopo(p)));
   const arquivados=ordenar(pacientes.filter(p=>p.arquivado&&noEscopo(p)));
   const atual=pacientes.find(p=>p.id===nav.id);
@@ -2393,12 +2416,12 @@ function App(){
       </header>
 
       {nav.tela==='quadro' &&
-        <Quadro pacientes={filtro==='arquivados'?arquivados:ativos} totalArquivados={arquivados.length}
+        <Quadro pacientes={ativos} arquivados={arquivados} uid={user.uid} equipes={equipes}
           ir={setNav} largo={largo} filtro={filtro} setFiltro={setFiltro}
           escopos={escopos} escopo={escopo} setEscopo={setEscopo}
-          moverEscopo={moverEscopo} moverStatus={moverStatus} novaEquipe={()=>setConfig(true)}/>}
+          moverEscopo={moverEscopo} moverStatus={moverStatus} seguir={seguir} novaEquipe={()=>setConfig(true)}/>}
       {nav.tela==='ficha' && atual &&
-        <Ficha p={atual} perfil={perfil} uid={user.uid} autor={autor} equipes={equipes} moverEscopo={moverEscopo} ir={setNav} atualizar={salvar} aviso={setToast}
+        <Ficha p={atual} perfil={perfil} uid={user.uid} autor={autor} equipes={equipes} moverEscopo={moverEscopo} seguir={seguir} ir={setNav} atualizar={salvar} aviso={setToast}
           editar={()=>setModal({editar:atual})} arquivar={()=>arquivar(atual)} remover={()=>remover(atual)}/>}
       {nav.tela==='evo' && atual &&
         <Evolucao p={atual} tipo={nav.tipo} autor={autor} ir={setNav} atualizar={salvar} aviso={setToast} largo={largo} proximo={irProximo}/>}
