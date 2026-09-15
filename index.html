@@ -231,6 +231,12 @@
   .cartao[data-arrastando="1"]{opacity:.4;transform:rotate(-1.5deg)}
   .coluna[data-sobre="1"]{background:var(--verde-claro);border-color:var(--verde)}
   .coluna[data-sobre="1"] .vazio{border-color:var(--verde);color:var(--verde)}
+  .resumo-caso{background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--verde);
+    border-radius:var(--raio);padding:12px 14px;margin-bottom:10px}
+  .rc-bloco{display:grid;grid-template-columns:92px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--linha);font-size:13.5px}
+  .rc-bloco:first-of-type{border-top:none}
+  .rc-tit{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-fraca);padding-top:2px}
+  .rc-txt{white-space:pre-wrap;line-height:1.45}
   .campo-pa{flex:1 1 100%}
   .pa-linha{display:flex;align-items:center;gap:8px}
   .pa-linha input{width:88px;flex:0 0 auto;text-align:center;font-family:var(--mono);font-size:16px}
@@ -2149,10 +2155,7 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
           {p.status==='uti' && <span className="pulseira p-pend">UTI</span>}
           {p.equipeId && <span className="pulseira p-dih">👥 {(equipes.find(e=>e.id===p.equipeId)||{}).nome||'equipe'}</span>}
         </div>
-        {p.dx && <div className="item"><div className="item-cab"><span>DIAGNÓSTICO</span></div><p>{p.dx}</p></div>}
-        {p.problemas && <div className="item"><div className="item-cab"><span>LISTA DE PROBLEMAS</span></div><p>{p.problemas}</p></div>}
-        {p.muc && <div className="item"><div className="item-cab"><span>MEDICAÇÕES EM USO</span></div><p>{p.muc}</p></div>}
-        {p.importado&&p.importado.interconsultas && <div className="item"><div className="item-cab"><span>INTERCONSULTAS (PRONTUÁRIO)</span></div><p>{p.importado.interconsultas}</p></div>}
+        <ResumoCaso p={p}/>
 
         <div className="secao-tit">
           <span>Colar evolução do prontuário</span>
@@ -2337,6 +2340,37 @@ function Ficha({p,perfil,uid,autor,equipes,ir,atualizar,aviso,editar,arquivar,re
   );
 }
 
+/* ---------- Resumo do caso: o que se le antes de entrar no quarto ---------- */
+function ResumoCaso({p}){
+  const [tudo,setTudo]=useState(false);
+  const imp=p.importado||{};
+  const ultLab=(p.labs&&p.labs[0]&&p.labs[0].linha)||(imp.lab||'').split('\n').map(x=>x.trim()).filter(Boolean)[0]||'';
+  const ultEvo=(p.evolucoes||[]).find(e=>e.tipo==='médica'||e.tipo==='prontuário');
+  const abertas=(p.pendencias||[]).filter(x=>!x.feito);
+  const dsp=dispositivosTexto(p), atb=antibioticosTexto(p);
+  const vazio=!p.dx&&!p.problemas&&!p.muc&&!ultLab&&!ultEvo&&!imp.plano;
+  if(vazio) return <div className="vazio" style={{marginBottom:6}}>Sem resumo ainda — cole a evolução do prontuário abaixo e o caso aparece aqui.</div>;
+  const Bloco=({t,children})=>children?<div className="rc-bloco"><span className="rc-tit">{t}</span><div className="rc-txt">{children}</div></div>:null;
+  return (
+    <div className="resumo-caso">
+      <div className="item-cab" style={{marginBottom:8}}><span>RESUMO DO CASO</span>
+        <button className="link" onClick={()=>setTudo(!tudo)}>{tudo?'resumir':'ver completo'}</button></div>
+      <Bloco t="Problemas">{p.problemas||p.dx}</Bloco>
+      {(dsp||atb) && <Bloco t="Em uso">{[dsp&&'Dispositivos: '+dsp, atb&&'ATB: '+atb].filter(Boolean).join(' · ')}</Bloco>}
+      <Bloco t="MUC">{p.muc}</Bloco>
+      {p.alergia && <Bloco t="Alergia">{p.alergia}</Bloco>}
+      <Bloco t="Último lab">{ultLab.replace(/^-\s*/,'')}</Bloco>
+      {ultEvo && <Bloco t={(ultEvo.tipo==='prontuário'?'Prontuário ':'Evolução ')+new Date(ultEvo.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}>
+        {tudo?ultEvo.texto:ultEvo.resumo}</Bloco>}
+      {tudo && <Bloco t="Admissão">{imp.admissao}</Bloco>}
+      {tudo && <Bloco t="Interconsultas">{imp.interconsultas}</Bloco>}
+      <Bloco t="Plano vigente">{tudo?imp.plano:(imp.plano||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,3).join(' · ')}</Bloco>
+      {abertas.length>0 && <Bloco t="Pendente">{abertas.map(x=>x.texto).join(' · ')}</Bloco>}
+      {p.proximoPlantao && <Bloco t="Para o próximo plantão">{p.proximoPlantao}</Bloco>}
+    </div>
+  );
+}
+
 /* ---------- Construtor de evolução (passo a passo no celular) ---------- */
 const VITAIS=['pas','pad','fc','fr','tax','sat','hgt','diu','bh','spo2','o2','glasgow','eva','tec','debito','peso',
   'labData','hb','ht','leuco','plaq','na','k','pi','mg','ur','cr','tfg','pcr','tp','ttpa','rni','gaso','labExtra','ic','img','dialivre','interc'];
@@ -2499,7 +2533,7 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
     alergia:'',admissao:new Date().toISOString().slice(0,10),riscoQueda:false,lpp:false,equipeId:equipeId||null,...(inicial||{})}));
   const s=(k,val)=>setF(o=>({...o,[k]:val}));
   const editando=!!(inicial&&inicial.id);
-  const [colar,setColar]=useState(false); const [txt,setTxt]=useState(''); const [lido,setLido]=useState(null);
+  const [colar,setColar]=useState(!editando); const [txt,setTxt]=useState(''); const [lido,setLido]=useState(null);
   function ler(){
     const r=lerProntuario(txt); setLido(r);
     setF(o=>({...o, leito:r.leito||o.leito, iniciais:r.iniciais||o.iniciais, dx:r.dx||o.dx, problemas:r.problemas||o.problemas,
@@ -2522,18 +2556,20 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
         <h2>{editando?'Editar paciente':'Novo paciente'}</h2>
         {!editando && (colar
           ? <div className="item" style={{marginBottom:12}}>
-              <textarea value={txt} onChange={e=>setTxt(e.target.value)} style={{minHeight:120}}
-                placeholder="Cole a evolução do prontuário. Leito, iniciais, problemas, MUC, alergia, exames, interconsultas e plano entram sozinhos."/>
+              <span className="campo-lab">Cole a evolução do prontuário</span>
+              <textarea value={txt} onChange={e=>setTxt(e.target.value)} style={{minHeight:150}} autoFocus
+                placeholder="Copie a última evolução no MV/Tasy/Soul e cole aqui. O app lê leito, iniciais, problemas, MUC, alergia, exames, interconsultas e plano — e troca o nome pelas iniciais."/>
               <div style={{display:'flex',gap:8,marginTop:8}}>
-                <button className="btn sec" style={{flex:1}} onClick={()=>{setColar(false);}}>Fechar</button>
-                <button className="btn" style={{flex:1}} disabled={!txt.trim()} onClick={ler}>Ler</button>
+                <button className="btn sec" style={{flex:1}} onClick={()=>{setColar(false);}}>Cadastrar à mão</button>
+                <button className="btn" style={{flex:1}} disabled={!txt.trim()} onClick={ler}>Ler o prontuário</button>
               </div>
-              {lido && <div className="aviso" style={{marginTop:8}}>Reconhecido: {lido.reconhecido.join(', ')||'nada — o texto vai como registro'}. Confira os campos abaixo.</div>}
+              {lido && <div className="aviso" style={{marginTop:8}}>Reconhecido: {lido.reconhecido.join(', ')||'nada — o texto vai como registro'}. Confira os campos abaixo e salve.</div>}
             </div>
           : <button className="btn sec" style={{width:'100%',marginBottom:12}} onClick={()=>setColar(true)}>📋 Colar do prontuário</button>)}
+        {(editando||!colar||lido) && <>
         <div className="linha-num">
           <div className="num"><label>Leito</label>
-            <input value={f.leito} onChange={e=>s('leito',e.target.value)} autoFocus={!editando}/></div>
+            <input value={f.leito} onChange={e=>s('leito',e.target.value)} autoFocus={!editando&&!colar}/></div>
           <div className="num"><label>Iniciais</label>
             <input value={f.iniciais} onChange={e=>s('iniciais',e.target.value.toUpperCase())} placeholder="J.S.A."/></div>
           <div className="num"><label>Idade</label>
@@ -2575,12 +2611,13 @@ function FormPaciente({inicial,fechar,salvar,equipes,equipeId}){
           <button className="op" data-on={f.riscoQueda?'1':'0'} onClick={()=>s('riscoQueda',!f.riscoQueda)}>Risco de queda</button>
           <button className="op" data-on={f.lpp?'1':'0'} onClick={()=>s('lpp',!f.lpp)}>Lesão por pressão</button>
         </div>
-        {!editando && <div className="aviso" style={{marginBottom:16}}>
+        {!editando && !lido && <div className="aviso" style={{marginBottom:16}}>
           Use iniciais, não o nome completo. Menos identificação, menos risco — o leito já basta para achar a pessoa.
         </div>}
+        </>}
         <div style={{display:'flex',gap:10}}>
           <button className="btn sec" style={{flex:1}} onClick={fechar}>Cancelar</button>
-          <button className="btn" style={{flex:1}} disabled={!f.leito||!f.iniciais}
+          <button className="btn" style={{flex:1}} disabled={!f.leito||!f.iniciais||(!editando&&colar&&!lido)}
             onClick={()=>{
               const letras=f.iniciais.replace(/[^A-ZÀ-Ú]/g,'');
               const ini=letras.length&&letras.length<=5&&!f.iniciais.includes('.')?letras.split('').join('.')+'.':f.iniciais;
