@@ -1,5 +1,5 @@
 // Ronda — service worker: abre sem internet e nunca "gruda" num erro.
-const CACHE='ronda-v13';
+const CACHE='ronda-v15';
 const ARQ=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',e=>{
