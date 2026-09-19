@@ -235,6 +235,7 @@ function Login({ onIn }){
 /* ================= HOME ================= */
 function Home({ onAbrir, papel }){
   const [res,setRes]=useState(null);
+  const [aba,setAba]=useState("inicio"); // 'inicio' | 'atencao' — hook antes de qualquer return
   useEffect(()=>{ (async()=>{
     try{
       const [docs, ins, lot, pts, le6, at, col, ag] = await Promise.all([
@@ -322,7 +323,6 @@ function Home({ onAbrir, papel }){
     return {cls:"ok", t:"Tudo certo"};
   };
 
-  const [aba,setAba]=useState("inicio"); // 'inicio' | 'atencao'
   const nCrit=att.filter(a=>a.sev==="bad").length;
   const nTotal=att.length;
   return (
