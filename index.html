@@ -120,6 +120,8 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
 
+const VERSAO_PLATAFORMA="v19.09-b";
+console.log("PLATAFORMA "+VERSAO_PLATAFORMA);
 const configurado = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 const sb = configurado ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
@@ -292,22 +294,21 @@ function Home({ onAbrir, papel }){
     }catch(e){ setRes({ erro:true }); }
   })(); },[]);
 
-  if(!res) return <div className="center">Carregando o resumo…</div>;
-  if(res.erro) return <div className="center">Não consegui carregar os dados. Confira se os schemas foram criados no Supabase e se as chaves estão preenchidas.</div>;
-
-  // painel de atenção
+  // Tudo abaixo roda em TODA renderização (sem return antecipado) — evita erro de hooks.
+  const pronto = !!(res && !res.erro);
   const att=[];
-  if(res.geladeiras.bad) att.push({ sev:"bad", txt:`${res.geladeiras.bad} equipamento(s) fora da temperatura`, mod:"geladeiras" });
-  if(res.documentos.bad) att.push({ sev:"bad", txt:`${res.documentos.bad} documento(s) vencido(s)`, mod:"documentos" });
-  if(res.estoque.bad) att.push({ sev:"bad", txt:`${res.estoque.bad} item(ns) de estoque no vermelho`, mod:"estoque" });
-  if(res.geladeiras.warn) att.push({ sev:"warn", txt:`${res.geladeiras.warn} equipamento(s) com leitura atrasada`, mod:"geladeiras" });
-  if(res.documentos.warn) att.push({ sev:"warn", txt:`${res.documentos.warn} documento(s) vencendo em breve`, mod:"documentos" });
-  if(res.estoque.warn) att.push({ sev:"warn", txt:`${res.estoque.warn} item(ns) de estoque para repor ou vencendo`, mod:"estoque" });
-  if(res.equipe.bad) att.push({ sev:"bad", txt:`${res.equipe.bad} pendência(s) vencida(s) na equipe (férias, exame ou registro)`, mod:"equipe" });
-  if(res.equipe.warn) att.push({ sev:"warn", txt:`${res.equipe.warn} pendência(s) da equipe vencendo em breve`, mod:"equipe" });
-  if(res.atendimentos.blueN) att.push({ sev:"blue", txt:`${brl(res.atendimentos.blueV)} a faturar (${res.atendimentos.blueN} atendimentos)`, mod:"atendimentos" });
-  if(res.agenda.warn) att.push({ sev:"warn", txt:`${res.agenda.warn} agendamento(s) de hoje a confirmar`, mod:"agenda" });
-
+  if(pronto){
+    if(res.geladeiras.bad) att.push({ sev:"bad", txt:`${res.geladeiras.bad} equipamento(s) fora da temperatura`, mod:"geladeiras" });
+    if(res.documentos.bad) att.push({ sev:"bad", txt:`${res.documentos.bad} documento(s) vencido(s)`, mod:"documentos" });
+    if(res.estoque.bad) att.push({ sev:"bad", txt:`${res.estoque.bad} item(ns) de estoque no vermelho`, mod:"estoque" });
+    if(res.geladeiras.warn) att.push({ sev:"warn", txt:`${res.geladeiras.warn} equipamento(s) com leitura atrasada`, mod:"geladeiras" });
+    if(res.documentos.warn) att.push({ sev:"warn", txt:`${res.documentos.warn} documento(s) vencendo em breve`, mod:"documentos" });
+    if(res.estoque.warn) att.push({ sev:"warn", txt:`${res.estoque.warn} item(ns) de estoque para repor ou vencendo`, mod:"estoque" });
+    if(res.equipe.bad) att.push({ sev:"bad", txt:`${res.equipe.bad} pendência(s) vencida(s) na equipe (férias, exame ou registro)`, mod:"equipe" });
+    if(res.equipe.warn) att.push({ sev:"warn", txt:`${res.equipe.warn} pendência(s) da equipe vencendo em breve`, mod:"equipe" });
+    if(res.atendimentos.blueN) att.push({ sev:"blue", txt:`${brl(res.atendimentos.blueV)} a faturar (${res.atendimentos.blueN} atendimentos)`, mod:"atendimentos" });
+    if(res.agenda.warn) att.push({ sev:"warn", txt:`${res.agenda.warn} agendamento(s) de hoje a confirmar`, mod:"agenda" });
+  }
   const statusModulo=(key)=>{
     if(key==="apresentacao") return {cls:"muted", t:"Indicadores e PDF"};
     if(key==="profissionais") return {cls:"muted", t:"Cadastro e disponibilidade"};
@@ -315,21 +316,25 @@ function Home({ onAbrir, papel }){
     if(key==="ponto") return {cls:"muted", t:"Cadastro e relatório de horas"};
     if(key==="acessos") return {cls:"muted", t:"Logins e perfis da equipe"};
     if(key==="financeiro") return {cls:"muted", t:"Receitas, despesas e resultado"};
-    const r=res[key];
+    const r=pronto ? res[key] : null;
+    if(!r) return {cls:"muted", t:"—"};
     if(key==="atendimentos") return r.blueN? {cls:"blue", t:`${brl(r.blueV)} a faturar`} : {cls:"ok", t:"Nada pendente"};
     if(key==="agenda") return r.total? {cls:r.warn?"warn":"blue", t:`${r.total} hoje${r.warn?` · ${r.warn} a confirmar`:""}`} : {cls:"ok", t:"Sem agendamentos hoje"};
     if(r.bad) return {cls:"bad", t:`${r.bad} precisam de atenção`};
     if(r.warn) return {cls:"warn", t:`${r.warn} para acompanhar`};
     return {cls:"ok", t:"Tudo certo"};
   };
-
   const nCrit=att.filter(a=>a.sev==="bad").length;
   const nTotal=att.length;
+
   return (
     <div className="home">
       <h2 className="hi">Bom te ver por aqui</h2>
       <p>Este é o resumo da clínica agora.</p>
 
+      {!res ? <div className="center">Carregando o resumo…</div>
+       : res.erro ? <div className="center">Não consegui carregar os dados. Confira se os schemas foram criados no Supabase e se as chaves estão preenchidas.</div>
+       : <>
       <div className="hometabs">
         <button className={aba==="inicio"?"on":""} onClick={()=>setAba("inicio")}>Início</button>
         <button className={aba==="atencao"?"on":""} onClick={()=>setAba("atencao")}>
@@ -366,6 +371,7 @@ function Home({ onAbrir, papel }){
               ))}
         </div>
       )}
+      </>}
     </div>
   );
 }
@@ -472,7 +478,7 @@ function App(){
       <div className="bar">
         <span className="logo">C</span>
         {view==="home"
-          ? <span className="title">Plataforma da Clínica</span>
+          ? <span className="title">Plataforma da Clínica <span style={{fontSize:10,color:"var(--muted)",fontWeight:500,marginLeft:6}}>{VERSAO_PLATAFORMA}</span></span>
           : <><button className="back" onClick={()=>setView("home")}>‹ Início</button><span className="title">{mod?.nome}</span></>}
         <span className="sp"></span>
         {sair}
