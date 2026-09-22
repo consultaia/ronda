@@ -417,7 +417,7 @@ const nuvem = {
     catch(e){ console.warn('acesso:',e.message); return false; }
   },
 };
-const VERSAO='v15';
+const VERSAO='v16';
 const DIA=86400000;
 const ARQUIVO_DIAS=30; // pacientes arquivados sao apagados apos 30 dias (LGPD: minimo necessario)
 
@@ -1520,6 +1520,29 @@ function labLinha(v){
   const d=(v.labData&&v.labData.trim())||new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
   return '- LAB ('+d+'): '+partes.join(' | ');
 }
+// Le as linhas "- LAB (dd/mm): HB 12 | PCR 8,3 / ..." e monta a curva por analito, em ordem de data.
+const ALIAS={HB:['HB'],HT:['HT'],LEUCO:['LEUCO','LEU','LEUC'],PLAQ:['PLAQ','PLA','PQ','PLAQUETAS'],NA:['NA'],K:['K'],
+  UR:['UR','UREIA'],CR:['CR','CREATININA'],TFG:['TFG','RFG'],PCR:['PCR'],TP:['TP'],RNI:['RNI','INR'],TTPA:['TTPA'],
+  MG:['MG'],P:['P'],LACT:['LACT','LACTATO'],BT:['BT','BILIRRUBINA TOTAL'],TGO:['TGO','AST'],TGP:['TGP','ALT']};
+const ORDEM_TEND=['PCR','LEUCO','HB','PLAQ','CR','UR','TFG','NA','K','MG','P','RNI','TTPA','TP','LACT','TGO','TGP','BT'];
+function lerLinhaLab(linha){
+  const m=linha.match(/\((\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\)/); if(!m) return null;
+  const dia=Number(m[1]), mes=Number(m[2]), ano=m[3]?Number(m[3].length===2?'20'+m[3]:m[3]):new Date().getFullYear();
+  const corpo=linha.slice(linha.indexOf(')')+1).replace(/^[\s:]+/,'').replace(/\([^)]*\)/g,' ');
+  const vals={};
+  corpo.split(/[|\/;]/).forEach(tok=>{
+    const t=tok.trim().match(/^([A-ZÁÉÍÓÚÇ][A-ZÁÉÍÓÚÇ ]{0,18}?)\s*:?\s*([\d]+(?:[.,]\d+)?)(\s*MIL)?/i);
+    if(!t) return; const nome=t[1].trim().toUpperCase();
+    const chave=Object.keys(ALIAS).find(k=>ALIAS[k].includes(nome)); if(chave&&!(chave in vals)) vals[chave]=t[2]+(t[3]?' mil':'');
+  });
+  return {data:new Date(ano,mes-1,dia).getTime(),rot:String(dia).padStart(2,'0')+'/'+String(mes).padStart(2,'0'),vals};
+}
+function tendencias(p,v){
+  const linhas=historicoLabs(p,v).map(lerLinhaLab).filter(Boolean).sort((a,b)=>a.data-b.data);
+  const out=[];
+  ORDEM_TEND.forEach(k=>{ const serie=linhas.filter(l=>k in l.vals); if(serie.length>=2) out.push(k+' '+serie.map(l=>l.vals[k]).join(' → ')); });
+  return out;
+}
 function historicoLabs(p,v){
   const L=[];
   const hoje=labLinha(v||{}); if(hoje) L.push(hoje);
@@ -1623,6 +1646,7 @@ function gerarHospitalar(p,vBruto){
   L.push('Exames complementares:');
   L.push('Exames internos laboratoriais:');
   if(labs.length) labs.forEach(x=>L.push(x)); else L.push('- ');
+  const tend=tendencias(p,v); if(tend.length) L.push('Tendência: '+tend.slice(0,8).join(' · '));
   const imgAnt=(p.importado&&p.importado.imagem)||'', culAnt=(p.importado&&p.importado.culturas)||'', uri=(p.importado&&p.importado.urina)||'';
   if(uri){ L.push('Sumário de urina:'); L.push(uri.trim()); }
   if(v.img||imgAnt){
@@ -1987,8 +2011,11 @@ function Folha({texto}){
 }
 
 /* ---------- Quadro ---------- */
-function Quadro({pacientes,arquivados,ir,largo,filtro,setFiltro,uid,equipes,
+const hojeISO=()=>new Date().toISOString().slice(0,10);
+const evoluidoHoje=(p,tipoEvo)=>(p.evolucoes||[]).some(e=>e.tipo===tipoEvo&&e.quando&&e.quando.slice(0,10)===hojeISO());
+function Quadro({pacientes,arquivados,ir,largo,filtro,setFiltro,uid,equipes,tipoEvo,
                  escopos,escopo,setEscopo,moverEscopo,moverStatus,novaEquipe,seguir}){
+  const faltam=pacientes.filter(p=>!evoluidoHoje(p,tipoEvo)).length;
   const contar=s=>pacientes.filter(p=>p.status===s).length;
   const [arrastando,setArrastando]=useState(null);
   const [sobre,setSobre]=useState(null);
@@ -2031,6 +2058,9 @@ function Quadro({pacientes,arquivados,ir,largo,filtro,setFiltro,uid,equipes,
             {p.lpp && <span className="pulseira p-lpp">LPP</span>}
             {pend>0 && <span className="pulseira p-pend">{pend} pendência{pend>1?'s':''}</span>}
             {nd>0 && <span className="pulseira p-pend">{nd} dispositivo{nd>1?'s':''}</span>}
+            {evoluidoHoje(p,tipoEvo)
+              ? <span className="pulseira p-dih">hoje ✓</span>
+              : <span className="pulseira p-queda">sem evolução hoje</span>}
           </div>
         </div>
         {escopo!=='pessoal' &&
@@ -2053,6 +2083,7 @@ function Quadro({pacientes,arquivados,ir,largo,filtro,setFiltro,uid,equipes,
       ))}
       <button className="aba nova" onClick={novaEquipe}>+ equipe</button>
       <span style={{flex:1}}/>
+      {faltam>0 && filtro!=='arquivados' && <span className="aba-dica" style={{color:'var(--ambar)',fontWeight:700}}>{faltam} sem evolução hoje</span>}
       {largo && arrastando
         ? <span className="aba-dica">solte numa coluna (situação) ou numa aba (ambiente)</span>
         : <button className="aba arq" data-on={filtro==='arquivados'?'1':'0'} onClick={()=>setFiltro(filtro==='arquivados'?'todos':'arquivados')}>
@@ -2396,6 +2427,7 @@ function ResumoCaso({p}){
       <Bloco t="MUC">{p.muc}</Bloco>
       {p.alergia && <Bloco t="Alergia">{p.alergia}</Bloco>}
       <Bloco t="Último lab">{ultLab.replace(/^-\s*/,'')}</Bloco>
+      {tendencias(p).length>0 && <Bloco t="Tendência">{tendencias(p).slice(0,tudo?99:6).join('\n')}</Bloco>}
       {ultEvo && <Bloco t={(ultEvo.tipo==='prontuário'?'Prontuário ':'Evolução ')+new Date(ultEvo.quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}>
         {tudo?ultEvo.texto:ultEvo.resumo}</Bloco>}
       {tudo && <Bloco t="Admissão">{imp.admissao}</Bloco>}
@@ -2703,7 +2735,7 @@ function Equipes({equipes,uid,email,aviso,usarEscopo}){
     catch(e){ console.error(e); aviso(e.message.includes('Código')?e.message:'código inválido'); }
     setIndo(false);
   }
-  const convite=e=>'https://wa.me/?text='+encodeURIComponent('Entra na minha equipe no Ronda: abre '+location.origin+location.pathname+' → toca no nome no topo → Criar ou entrar numa equipe → código '+e.codigo);
+  const convite=e=>'https://wa.me/?text='+encodeURIComponent('Entra na minha equipe "'+e.nome+'" no Ronda — é só abrir este link e entrar com sua conta:\n'+location.origin+location.pathname+'?entrar='+e.codigo+'\n(código: '+e.codigo+')');
   return (
     <div style={{marginBottom:16}}>
       <span className="campo-lab">Equipes</span>
@@ -2750,8 +2782,15 @@ function Equipes({equipes,uid,email,aviso,usarEscopo}){
 function Login(){
   const [email,setEmail]=useState(''); const [senha,setSenha]=useState('');
   const [erro,setErro]=useState(''); const [indo,setIndo]=useState(false);
+  const [ok,setOk]=useState('');
+  async function recuperar(){
+    setErro(''); setOk('');
+    if(!email.trim()){ setErro('Digite seu e-mail no campo acima e toque de novo em "Esqueci minha senha".'); return; }
+    try{ await auth.sendPasswordResetEmail(email.trim()); setOk('Enviamos um link para '+email.trim()+'. Abra o e-mail, crie a nova senha e volte aqui.'); }
+    catch(e){ setErro(e.code==='auth/user-not-found'?'E-mail não cadastrado.':'Não foi possível enviar: '+e.message); }
+  }
   async function entrar(){
-    setErro(''); if(!email||!senha){ setErro('Preencha e-mail e senha.'); return; }
+    setErro(''); setOk(''); if(!email||!senha){ setErro('Preencha e-mail e senha.'); return; }
     setIndo(true);
     try{ await auth.signInWithEmailAndPassword(email.trim(),senha); }
     catch(e){
@@ -2772,7 +2811,9 @@ function Login(){
         <input type="password" placeholder="Senha" value={senha} autoComplete="current-password"
           onChange={e=>setSenha(e.target.value)} onKeyDown={e=>e.key==='Enter'&&entrar()} style={{marginBottom:12}}/>
         {erro && <div className="aviso alerta" style={{marginTop:0,marginBottom:12}}>{erro}</div>}
+        {ok && <div className="aviso" style={{marginTop:0,marginBottom:12,background:'var(--verde-claro)',borderColor:'var(--verde)',color:'var(--verde)'}}>{ok}</div>}
         <button className="btn" style={{width:'100%'}} disabled={indo} onClick={entrar}>{indo?'Entrando…':'Entrar'}</button>
+        <button className="link" style={{width:'100%',marginTop:10,background:'none'}} onClick={recuperar}>Esqueci minha senha</button>
         <a className="btn sec" style={{width:'100%',marginTop:10,textDecoration:'none'}}
           href="https://wa.me/5571982074343?text=Quero+testar+o+Ronda+por+7+dias" target="_blank" rel="noopener">
           Ainda não tenho conta — pedir acesso
@@ -2855,6 +2896,12 @@ function App(){
   const [online,setOnline]=useState(navigator.onLine);
   const inst=usarInstalacao();
 
+  useEffect(()=>{ const c=new URLSearchParams(location.search).get('entrar'); if(c){ sessionStorage.setItem('ronda.entrar',c.toUpperCase()); history.replaceState(null,'',location.pathname); } },[]);
+  useEffect(()=>{
+    const c=sessionStorage.getItem('ronda.entrar'); if(!c||!user||bloqueado||!usuario) return;
+    sessionStorage.removeItem('ronda.entrar');
+    nuvem.entrarEquipe(c,user.uid,user.email).then(nome=>{ setToast('você entrou em '+nome); }).catch(()=>setToast('código de convite inválido'));
+  },[user,bloqueado,usuario]); // eslint-disable-line
   useEffect(()=>auth.onAuthStateChanged(async u=>{
     if(!u){ setUser(null); setUsuario(null); setMeus(null); setEquipes([]); setPorEquipe({}); setBloqueado(false); return; }
     const ok=await nuvem.autorizado(u.email);
@@ -2994,7 +3041,7 @@ function App(){
       </header>
 
       {nav.tela==='quadro' &&
-        <Quadro pacientes={ativos} arquivados={arquivados} uid={user.uid} equipes={equipes}
+        <Quadro pacientes={ativos} arquivados={arquivados} uid={user.uid} equipes={equipes} tipoEvo={ehEnf?'enfermagem':'médica'}
           ir={setNav} largo={largo} filtro={filtro} setFiltro={setFiltro}
           escopos={escopos} escopo={escopo} setEscopo={setEscopo}
           moverEscopo={moverEscopo} moverStatus={moverStatus} seguir={seguir} novaEquipe={()=>setConfig(true)}/>}
